@@ -342,7 +342,7 @@
 
 .markdown-body td,
 .markdown-body th {
-  padding: 0;
+  padding: 8px 16px;
 }
 
 .markdown-body details summary {
@@ -701,7 +701,7 @@
 
 .markdown-body table th,
 .markdown-body table td {
-  padding: 6px 13px;
+  padding: 8px 16px;
   border: 1px solid var(--borderColor-default);
 }
 

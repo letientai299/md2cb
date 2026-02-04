@@ -55,6 +55,6 @@ Auto link: https://github.com
 
 [Inline](https://google.com) and [anchor][gg].
 
-![pic alt](test/haru.png "avatar")
+![pic alt](./haru.png "avatar")
 
 [gg]: https://google.com

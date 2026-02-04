@@ -1,0 +1,73 @@
+{
+  "timestamp": "2026-02-04T16:07:49.542Z",
+  "totalFiles": 11,
+  "filesWithIssues": 0,
+  "results": [
+    {
+      "file": "test/demo.md",
+      "issues": [],
+      "browserHtmlLength": 6288,
+      "md2cbHtmlLength": 2151
+    },
+    {
+      "file": "test/edge-cases/01-inline-code.md",
+      "issues": [],
+      "browserHtmlLength": 6341,
+      "md2cbHtmlLength": 457
+    },
+    {
+      "file": "test/edge-cases/02-nested-blockquotes.md",
+      "issues": [],
+      "browserHtmlLength": 6355,
+      "md2cbHtmlLength": 505
+    },
+    {
+      "file": "test/edge-cases/03-complex-tables.md",
+      "issues": [],
+      "browserHtmlLength": 6347,
+      "md2cbHtmlLength": 1065
+    },
+    {
+      "file": "test/edge-cases/04-links.md",
+      "issues": [],
+      "browserHtmlLength": 6329,
+      "md2cbHtmlLength": 814
+    },
+    {
+      "file": "test/edge-cases/05-mixed-formatting.md",
+      "issues": [],
+      "browserHtmlLength": 6351,
+      "md2cbHtmlLength": 640
+    },
+    {
+      "file": "test/edge-cases/06-lists-advanced.md",
+      "issues": [],
+      "browserHtmlLength": 6347,
+      "md2cbHtmlLength": 708
+    },
+    {
+      "file": "test/edge-cases/07-math-edge.md",
+      "issues": [],
+      "browserHtmlLength": 6337,
+      "md2cbHtmlLength": 1554
+    },
+    {
+      "file": "test/edge-cases/08-html-passthrough.md",
+      "issues": [],
+      "browserHtmlLength": 6351,
+      "md2cbHtmlLength": 372
+    },
+    {
+      "file": "test/edge-cases/09-escapes.md",
+      "issues": [],
+      "browserHtmlLength": 6333,
+      "md2cbHtmlLength": 304
+    },
+    {
+      "file": "test/edge-cases/10-code-blocks.md",
+      "issues": [],
+      "browserHtmlLength": 6341,
+      "md2cbHtmlLength": 571
+    }
+  ]
+}
