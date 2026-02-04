@@ -5,10 +5,25 @@
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use resvg::tiny_skia::{Pixmap, Transform};
-use resvg::usvg::{Options, Tree};
+use resvg::usvg::{fontdb, Options, Tree};
+use std::sync::{Arc, OnceLock};
 
 /// Render scale factor for crisp output (4x like the original Node.js implementation)
 const RENDER_SCALE: f32 = 4.0;
+
+/// Global font database - loaded once and reused
+static FONT_DB: OnceLock<Arc<fontdb::Database>> = OnceLock::new();
+
+/// Get or initialize the font database with system fonts
+fn get_font_db() -> Arc<fontdb::Database> {
+    FONT_DB
+        .get_or_init(|| {
+            let mut db = fontdb::Database::new();
+            db.load_system_fonts();
+            Arc::new(db)
+        })
+        .clone()
+}
 
 /// Result of SVG to PNG conversion
 pub struct SvgRenderResult {
@@ -25,8 +40,9 @@ pub struct SvgRenderResult {
 /// The SVG is rendered at 4x resolution for crispness, but the returned
 /// display dimensions are the original size.
 pub fn render_svg_to_png(svg_content: &str) -> Result<SvgRenderResult, String> {
-    // Parse SVG
-    let opts = Options::default();
+    // Parse SVG with font database for text rendering
+    let mut opts = Options::default();
+    opts.fontdb = get_font_db();
     let tree = Tree::from_str(svg_content, &opts)
         .map_err(|e| format!("SVG parse error: {}", e))?;
 

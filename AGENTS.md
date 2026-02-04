@@ -4,8 +4,8 @@
 
 1. **Test your own work** - Never ask the user to test for you. Run automated tests
    (unit tests, integration tests, Playwright E2E tests) to verify changes work
-   correctly before reporting completion. Use `node test/paste-test.js` to verify
-   clipboard output renders correctly in the Froala editor.
+   correctly before reporting completion. Use Playwright to paste md2cb output
+   into the Froala editor (localhost:9090) to verify clipboard output renders correctly.
 
 2. **Use existing tools** - Don't implement custom parsers or converters when
    established crates/libraries exist. Search crates.io for existing solutions first.
@@ -30,9 +30,10 @@ The tool is written in Rust for cross-platform support (macOS, Windows, Linux).
 
 1. **Markdown → HTML**: Uses `comrak` crate (GFM-compliant CommonMark parser)
 2. **Math → PNG Images**: Uses embedded MathJax (via QuickJS) + resvg for LaTeX → SVG → PNG
-3. **Image Inlining**: Fetches images and embeds as base64 data URIs
-4. **CSS Embedding**: GitHub markdown CSS embedded at compile time
-5. **Clipboard**: Uses `arboard` crate for cross-platform HTML clipboard support
+3. **Mermaid → PNG Images**: Uses `mermaid-rs-renderer` (pure Rust) + resvg for diagrams → SVG → PNG
+4. **Image Inlining**: Fetches images and embeds as base64 data URIs
+5. **CSS Embedding**: GitHub markdown CSS embedded at compile time
+6. **Clipboard**: Uses `arboard` crate for cross-platform HTML clipboard support
 
 ### Why PNG Images for Math?
 
@@ -62,7 +63,7 @@ scripts/
 
 test/
 ├── demo.md              # Test markdown with all GFM features
-└── paste-test.js        # Playwright E2E test for paste verification
+└── index.html           # Froala editor for paste testing
 ```
 
 ## Development
@@ -108,6 +109,7 @@ make install  # Install to /usr/local/bin
 - Images with alt text and title (auto-inlined as base64)
 - Bold, italic, strikethrough, inline code
 - **Math** - inline (`$...$`) and display (`$$...$$`) rendered as PNG images via MathJax
+- **Mermaid diagrams** - flowcharts, sequence diagrams, etc. rendered as PNG images
 - HTML passthrough
 
 ## Image Inlining
@@ -137,6 +139,29 @@ supports all standard LaTeX environments including `split`, `aligned`, `matrix`,
 engine, and SVG→PNG conversion uses resvg (pure Rust). Everything is bundled
 into the single binary.
 
+## Mermaid Support
+
+Mermaid diagrams in fenced code blocks are converted to PNG images:
+
+```markdown
+\`\`\`mermaid
+graph LR
+    A[Start] --> B{Decision}
+    B -->|Yes| C[OK]
+    B -->|No| D[Cancel]
+\`\`\`
+```
+
+Supported diagram types (13 total):
+- **Core**: Flowchart, Sequence, Class, State
+- **Data**: ER Diagram, Pie Chart, XY Chart, Quadrant Chart
+- **Planning**: Gantt, Timeline, Journey
+- **Other**: Mindmap, Git Graph
+
+**No external dependencies**: Uses `mermaid-rs-renderer`, a pure Rust Mermaid
+parser and renderer. SVG→PNG conversion uses resvg. Everything is bundled into
+the single binary with no Node.js or browser required.
+
 ## Testing with Playwright
 
 Use Playwright to automate comparison testing between browser copy and md2cb
@@ -161,7 +186,7 @@ Math expressions use embedded MathJax (no external dependencies). Check that:
 - Display math uses `$$...$$` (must be on own line for block display)
 - Inline math uses `$...$` (no spaces around dollar signs)
 - Alignment characters (`&`) require proper environment (`\begin{aligned}`, `\begin{split}`, etc.)
-- Run `node test/paste-test.js` to verify math renders in editor
+- Use Playwright to paste into Froala editor (localhost:9090) to verify math renders
 
 ### Styles not applied
 

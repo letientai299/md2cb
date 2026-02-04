@@ -49,6 +49,21 @@ const greet = () => console.log("Hello!");
 - removed line
 ```
 
+## Diagrams
+
+```mermaid
+graph LR
+    A[Start] --> B{Decision}
+    B -->|Yes| C[OK]
+    B -->|No| D[Cancel]
+```
+
+```mermaid
+sequenceDiagram
+    Alice->>Bob: Hello Bob!
+    Bob-->>Alice: Hi Alice!
+```
+
 ## Links
 
 Auto link: https://github.com
