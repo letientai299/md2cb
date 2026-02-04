@@ -1,4 +1,5 @@
 mod clipboard;
+mod images;
 mod parser;
 
 use std::io::{self, Read};
@@ -13,14 +14,17 @@ fn main() {
     // Convert to HTML
     let html = parser::convert(&markdown);
 
+    // Inline images (convert URLs to base64 data URIs)
+    let html = images::inline_images(&html, None);
+
     // Build full HTML document with CSS
-    let css = include_str!("../assets/github-markdown.css");
+    let markdown_css = include_str!("../assets/github-markdown.css");
     let full_html = format!(
         r#"<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-<style>{css}</style>
+<style>{markdown_css}</style>
 </head>
 <body class="markdown-body">{html}</body>
 </html>"#

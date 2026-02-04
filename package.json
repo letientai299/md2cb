@@ -1,0 +1,22 @@
+{
+  "name": "md2cb",
+  "version": "1.0.0",
+  "description": "Markdown to clipboard converter. Converts GitHub Flavored Markdown (GFM) to rich HTML and copies it to the system clipboard for pasting into Word, Google Docs, Pages, etc.",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "canvas": "^3.2.1",
+    "mathjax-full": "^3.2.1",
+    "playwright": "^1.58.1",
+    "sharp": "^0.34.5"
+  }
+}
