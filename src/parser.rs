@@ -2,8 +2,9 @@
 
 use comrak::{markdown_to_html, Options};
 use regex::Regex;
-use std::process::{Command, Stdio};
-use std::io::Write;
+
+use crate::js_runtime;
+use crate::svg_render;
 
 /// Converts GitHub Flavored Markdown to HTML.
 pub fn convert(markdown: &str) -> String {
@@ -64,46 +65,32 @@ fn decode_html_entities(s: &str) -> String {
         .replace("&#39;", "'")
 }
 
-/// Renders LaTeX to SVG using MathJax via Node.js script.
+/// Renders LaTeX to PNG image tag using embedded MathJax + resvg.
+///
+/// This function:
+/// 1. Converts LaTeX to SVG using MathJax (via embedded QuickJS)
+/// 2. Renders SVG to PNG using resvg (pure Rust)
+/// 3. Returns an HTML img tag with base64-encoded PNG
 fn latex_to_svg(latex: &str, display: bool) -> Result<String, String> {
-    // Find the script relative to the executable or in common locations
-    let script_paths = [
-        "scripts/math-to-svg.js",
-        "./scripts/math-to-svg.js",
-        concat!(env!("CARGO_MANIFEST_DIR"), "/scripts/math-to-svg.js"),
-    ];
+    // Step 1: Convert LaTeX to SVG using embedded MathJax
+    let svg = js_runtime::convert_latex_to_svg(latex, display)?;
 
-    let script_path = script_paths
-        .iter()
-        .find(|p| std::path::Path::new(p).exists())
-        .ok_or_else(|| "math-to-svg.js script not found".to_string())?;
+    // Step 2: Render SVG to PNG using resvg
+    let render_result = svg_render::render_svg_to_png(&svg)?;
 
-    let mut cmd = Command::new("node");
-    cmd.arg(script_path);
-    if display {
-        cmd.arg("--display");
-    }
-    cmd.stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn node: {}", e))?;
-
-    if let Some(stdin) = child.stdin.as_mut() {
-        stdin
-            .write_all(latex.as_bytes())
-            .map_err(|e| format!("Failed to write to stdin: {}", e))?;
-    }
-
-    let output = child
-        .wait_with_output()
-        .map_err(|e| format!("Failed to wait for node: {}", e))?;
-
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    // Step 3: Build <img> tag with base64 PNG
+    let data_uri = format!("data:image/png;base64,{}", render_result.png_base64);
+    let alt = latex.replace('"', "&quot;");
+    let style = if display {
+        "display:block;margin:0.5em auto;"
     } else {
-        Err(String::from_utf8_lossy(&output.stderr).to_string())
-    }
+        "vertical-align:middle;"
+    };
+
+    Ok(format!(
+        r#"<img src="{}" alt="{}" width="{}" height="{}" style="{}">"#,
+        data_uri, alt, render_result.display_width, render_result.display_height, style
+    ))
 }
 
 /// Converts LaTeX content in comrak's math spans to SVG using MathJax.

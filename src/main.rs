@@ -1,9 +1,13 @@
 mod clipboard;
 mod images;
+mod js_runtime;
 mod parser;
+mod svg_render;
 
 use std::env;
-use std::io::{self, Read};
+use std::fs;
+use std::io::{self, Read, Write};
+use std::process::Command;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -12,12 +16,16 @@ fn print_help() {
         "md2cb - Convert GitHub Flavored Markdown to rich HTML clipboard content
 
 USAGE:
-    md2cb [OPTIONS]
+    md2cb [OPTIONS] [FILE]
     cat file.md | md2cb
 
 OPTIONS:
+    -e, --edit       Open $EDITOR to edit markdown before converting
     -h, --help       Print this help message
     -V, --version    Print version information
+
+ARGS:
+    [FILE]           Input markdown file (only with -e flag)
 
 DESCRIPTION:
     Reads Markdown from stdin, converts it to styled HTML, and copies
@@ -26,22 +34,72 @@ DESCRIPTION:
 
 FEATURES:
     - GitHub Flavored Markdown (tables, task lists, strikethrough, etc.)
-    - Math equations rendered as images (requires Node.js + MathJax)
+    - Math equations rendered as PNG images (embedded MathJax)
     - Images automatically inlined as base64 data URIs
     - GitHub-style CSS embedded for consistent styling
+    - Single binary with no external dependencies
 
 EXAMPLES:
     cat README.md | md2cb
     echo '# Hello' | md2cb
     md2cb < document.md
-
-REQUIREMENTS:
-    - For math rendering: Node.js with mathjax-full and canvas packages"
+    md2cb -e                   # Open editor with empty file
+    md2cb -e README.md         # Edit file before converting
+    cat README.md | md2cb -e   # Edit piped content before converting"
     );
 }
 
 fn print_version() {
     eprintln!("md2cb {VERSION}");
+}
+
+/// Generate a random temp file path with .md extension
+fn temp_file_path() -> std::path::PathBuf {
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let pid = std::process::id();
+    std::env::temp_dir().join(format!("md2cb-{pid}-{timestamp}.md"))
+}
+
+/// Open the file in $EDITOR and return the edited content
+fn edit_in_editor(initial_content: &str) -> Result<String, String> {
+    let editor = env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
+    let temp_path = temp_file_path();
+
+    // Write initial content to temp file
+    let mut file = fs::File::create(&temp_path)
+        .map_err(|e| format!("Failed to create temp file: {e}"))?;
+    file.write_all(initial_content.as_bytes())
+        .map_err(|e| format!("Failed to write temp file: {e}"))?;
+    drop(file);
+
+    // Open editor
+    let status = Command::new(&editor)
+        .arg(&temp_path)
+        .status()
+        .map_err(|e| format!("Failed to open editor '{editor}': {e}"))?;
+
+    if !status.success() {
+        let _ = fs::remove_file(&temp_path);
+        return Err(format!("Editor exited with status: {status}"));
+    }
+
+    // Read back the edited content
+    let content = fs::read_to_string(&temp_path)
+        .map_err(|e| format!("Failed to read temp file: {e}"))?;
+
+    // Clean up temp file
+    let _ = fs::remove_file(&temp_path);
+
+    Ok(content)
+}
+
+/// Check if stdin is a terminal (no piped input)
+fn stdin_is_terminal() -> bool {
+    use std::os::unix::io::AsRawFd;
+    unsafe { libc::isatty(io::stdin().as_raw_fd()) != 0 }
 }
 
 fn main() {
@@ -59,29 +117,67 @@ fn main() {
         return;
     }
 
+    // Check for --edit flag
+    let edit_mode = args.iter().any(|a| a == "--edit" || a == "-e");
+
     // Check for unknown flags
     for arg in &args {
-        if arg.starts_with('-') {
+        if arg.starts_with('-') && arg != "-e" && arg != "--edit" {
             eprintln!("error: unknown option '{arg}'");
-            eprintln!("Usage: md2cb [OPTIONS]");
+            eprintln!("Usage: md2cb [OPTIONS] [FILE]");
             eprintln!("Try 'md2cb --help' for more information.");
             std::process::exit(1);
         }
     }
 
-    // Check for unexpected positional arguments
-    if !args.is_empty() {
-        eprintln!("error: unexpected argument '{}'", args[0]);
-        eprintln!("Usage: cat file.md | md2cb");
+    // Get positional arguments (file path)
+    let positional: Vec<_> = args.iter().filter(|a| !a.starts_with('-')).collect();
+
+    // File argument is only allowed with -e flag
+    if !positional.is_empty() && !edit_mode {
+        eprintln!("error: FILE argument requires -e/--edit flag");
+        eprintln!("Usage: md2cb -e [FILE]");
         eprintln!("Try 'md2cb --help' for more information.");
         std::process::exit(1);
     }
 
-    // Read markdown from stdin
+    // Only one file argument allowed
+    if positional.len() > 1 {
+        eprintln!("error: too many arguments");
+        eprintln!("Usage: md2cb -e [FILE]");
+        eprintln!("Try 'md2cb --help' for more information.");
+        std::process::exit(1);
+    }
+
+    let input_file = positional.first().map(|s| s.as_str());
+
+    // Read markdown content
     let mut markdown = String::new();
-    io::stdin()
-        .read_to_string(&mut markdown)
-        .expect("Failed to read from stdin");
+    if let Some(file_path) = input_file {
+        // Read from file
+        markdown = fs::read_to_string(file_path).unwrap_or_else(|e| {
+            eprintln!("error: cannot read '{file_path}': {e}");
+            std::process::exit(1);
+        });
+    } else if edit_mode && stdin_is_terminal() {
+        // No stdin input and no file, start with empty content
+    } else {
+        // Read from stdin
+        io::stdin()
+            .read_to_string(&mut markdown)
+            .expect("Failed to read from stdin");
+    }
+
+    // If edit mode, open editor
+    if edit_mode {
+        match edit_in_editor(&markdown) {
+            Ok(edited) => markdown = edited,
+            Err(e) => {
+                eprintln!("Error: {e}");
+                std::process::exit(1);
+            }
+        }
+    }
 
     // Convert to HTML
     let html = parser::convert(&markdown);

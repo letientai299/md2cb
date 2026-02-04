@@ -25,10 +25,11 @@ styling preserved.
 
 ## Architecture
 
-The tool is written in Rust for cross-platform support (macOS, Windows, Linux):
+The tool is written in Rust for cross-platform support (macOS, Windows, Linux).
+**Single binary with no external runtime dependencies.**
 
 1. **Markdown → HTML**: Uses `comrak` crate (GFM-compliant CommonMark parser)
-2. **Math → PNG Images**: Uses MathJax (Node.js) to render LaTeX to PNG images embedded as base64 data URIs
+2. **Math → PNG Images**: Uses embedded MathJax (via QuickJS) + resvg for LaTeX → SVG → PNG
 3. **Image Inlining**: Fetches images and embeds as base64 data URIs
 4. **CSS Embedding**: GitHub markdown CSS embedded at compile time
 5. **Clipboard**: Uses `arboard` crate for cross-platform HTML clipboard support
@@ -47,14 +48,17 @@ Rich text editors (Froala, Word, Google Docs, etc.) sanitize pasted HTML:
 src/
 ├── main.rs        # Entry point, reads stdin, builds HTML document
 ├── parser.rs      # GFM to HTML converter with full test suite
+├── js_runtime.rs  # Embedded QuickJS runtime for MathJax
+├── svg_render.rs  # SVG to PNG conversion using resvg
 ├── images.rs      # Image inlining (URL to base64 data URI)
 └── clipboard.rs   # Cross-platform clipboard operations
 
-scripts/
-└── math-to-svg.js # MathJax-based LaTeX to PNG converter (called by parser.rs)
-
 assets/
-└── github-markdown.css  # GitHub's markdown CSS (embedded at compile)
+├── github-markdown.css  # GitHub's markdown CSS (embedded at compile)
+└── mathjax-bundle.js    # Bundled MathJax for embedded JS engine
+
+scripts/
+└── build-mathjax.js     # Script to regenerate mathjax-bundle.js
 
 test/
 ├── demo.md              # Test markdown with all GFM features
@@ -66,10 +70,9 @@ test/
 ### Prerequisites
 
 - Rust 1.70+ (install via rustup)
-- Node.js 18+ (for MathJax math rendering)
-- npm packages: `npm install mathjax-full canvas` (for math rendering)
 - Docker (for dev server)
 - pnpm (for markserv)
+- Node.js (only for Playwright tests and regenerating mathjax-bundle.js)
 
 ### Make targets
 
@@ -120,7 +123,7 @@ correctly when pasted into any rich text editor.
 
 ## Math Support
 
-LaTeX math expressions are converted to PNG images using MathJax:
+LaTeX math expressions are converted to PNG images using embedded MathJax:
 
 - **Inline math**: `$E = mc^2$` → renders as inline image
 - **Display math**: `$$\int_0^\infty e^{-x^2} dx$$` → renders as centered block image
@@ -130,8 +133,9 @@ The PNG approach ensures math renders correctly in all rich text editors. MathJa
 supports all standard LaTeX environments including `split`, `aligned`, `matrix`,
 `cases`, `pmatrix`, etc.
 
-**Prerequisites**: Node.js and npm packages (`mathjax-full`, `canvas`) must be
-installed for math rendering.
+**No external dependencies**: MathJax runs in an embedded QuickJS JavaScript
+engine, and SVG→PNG conversion uses resvg (pure Rust). Everything is bundled
+into the single binary.
 
 ## Testing with Playwright
 
@@ -153,9 +157,7 @@ GFM syntax. Enable `options.render.unsafe_` for raw HTML passthrough.
 
 ### Math not rendering
 
-Math expressions use MathJax via Node.js. Check that:
-- Node.js is installed and `scripts/math-to-svg.js` is accessible
-- npm packages are installed: `npm install mathjax-full canvas`
+Math expressions use embedded MathJax (no external dependencies). Check that:
 - Display math uses `$$...$$` (must be on own line for block display)
 - Inline math uses `$...$` (no spaces around dollar signs)
 - Alignment characters (`&`) require proper environment (`\begin{aligned}`, `\begin{split}`, etc.)
