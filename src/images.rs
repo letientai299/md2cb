@@ -110,6 +110,16 @@ fn guess_mime_type(path: &Path) -> &'static str {
 mod tests {
     use super::*;
 
+    // Minimal PNG (1x1 transparent pixel)
+    const PNG_BYTES: [u8; 67] = [
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+        0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
+        0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+        0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+        0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+    ];
+
     #[test]
     fn test_skip_data_uri() {
         let html = r#"<img src="data:image/png;base64,abc123">"#;
@@ -120,20 +130,10 @@ mod tests {
     #[test]
     fn test_inline_local_image() {
         // Create a test image
-        let test_dir = std::env::temp_dir().join("md2cb_test");
+        let test_dir = std::env::temp_dir().join("md2cb_test_local");
         fs::create_dir_all(&test_dir).unwrap();
         let img_path = test_dir.join("test.png");
-
-        // Write minimal PNG (1x1 transparent pixel)
-        let png_bytes: [u8; 67] = [
-            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
-            0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-            0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
-            0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
-            0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
-            0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
-        ];
-        fs::write(&img_path, png_bytes).unwrap();
+        fs::write(&img_path, PNG_BYTES).unwrap();
 
         let html = r#"<img src="test.png">"#;
         let result = inline_images(html, Some(&test_dir));
@@ -142,5 +142,56 @@ mod tests {
 
         // Cleanup
         fs::remove_dir_all(&test_dir).ok();
+    }
+
+    #[test]
+    fn test_inline_relative_path_in_subdir() {
+        // Create test structure: base_dir/images/test.png
+        let test_dir = std::env::temp_dir().join("md2cb_test_subdir");
+        let images_dir = test_dir.join("images");
+        fs::create_dir_all(&images_dir).unwrap();
+        fs::write(images_dir.join("test.png"), PNG_BYTES).unwrap();
+
+        // Relative path should resolve from base_dir
+        let html = r#"<img src="images/test.png">"#;
+        let result = inline_images(html, Some(&test_dir));
+
+        assert!(
+            result.starts_with(r#"<img src="data:image/png;base64,"#),
+            "Relative path in subdir should be resolved. Got: {}",
+            result
+        );
+
+        // Cleanup
+        fs::remove_dir_all(&test_dir).ok();
+    }
+
+    #[test]
+    fn test_inline_absolute_path() {
+        // Create test image at absolute path
+        let test_dir = std::env::temp_dir().join("md2cb_test_abs");
+        fs::create_dir_all(&test_dir).unwrap();
+        let img_path = test_dir.join("absolute.png");
+        fs::write(&img_path, PNG_BYTES).unwrap();
+
+        // Use absolute path in HTML
+        let abs_path_str = img_path.to_string_lossy();
+        let html = format!(r#"<img src="{}">"#, abs_path_str);
+
+        // base_path shouldn't matter for absolute paths
+        let other_dir = std::env::temp_dir().join("md2cb_test_other");
+        fs::create_dir_all(&other_dir).unwrap();
+
+        let result = inline_images(&html, Some(&other_dir));
+
+        assert!(
+            result.starts_with(r#"<img src="data:image/png;base64,"#),
+            "Absolute path should work regardless of base_path. Got: {}",
+            result
+        );
+
+        // Cleanup
+        fs::remove_dir_all(&test_dir).ok();
+        fs::remove_dir_all(&other_dir).ok();
     }
 }

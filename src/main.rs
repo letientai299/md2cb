@@ -25,7 +25,7 @@ OPTIONS:
     -V, --version    Print version information
 
 ARGS:
-    [FILE]           Input markdown file (only with -e flag)
+    [FILE]           Input markdown file
 
 DESCRIPTION:
     Reads Markdown from stdin, converts it to styled HTML, and copies
@@ -40,7 +40,8 @@ FEATURES:
     - Single binary with no external dependencies
 
 EXAMPLES:
-    cat README.md | md2cb
+    md2cb README.md            # Convert file directly
+    cat README.md | md2cb      # Convert from stdin
     echo '# Hello' | md2cb
     md2cb < document.md
     md2cb -e                   # Open editor with empty file
@@ -133,40 +134,39 @@ fn main() {
     // Get positional arguments (file path)
     let positional: Vec<_> = args.iter().filter(|a| !a.starts_with('-')).collect();
 
-    // File argument is only allowed with -e flag
-    if !positional.is_empty() && !edit_mode {
-        eprintln!("error: FILE argument requires -e/--edit flag");
-        eprintln!("Usage: md2cb -e [FILE]");
-        eprintln!("Try 'md2cb --help' for more information.");
-        std::process::exit(1);
-    }
-
     // Only one file argument allowed
     if positional.len() > 1 {
         eprintln!("error: too many arguments");
-        eprintln!("Usage: md2cb -e [FILE]");
+        eprintln!("Usage: md2cb [OPTIONS] [FILE]");
         eprintln!("Try 'md2cb --help' for more information.");
         std::process::exit(1);
     }
 
     let input_file = positional.first().map(|s| s.as_str());
 
-    // Read markdown content
+    // Read markdown content and track base path for relative image resolution
     let mut markdown = String::new();
-    if let Some(file_path) = input_file {
+    let base_path: Option<std::path::PathBuf> = if let Some(file_path) = input_file {
         // Read from file
-        markdown = fs::read_to_string(file_path).unwrap_or_else(|e| {
+        let path = std::path::Path::new(file_path);
+        markdown = fs::read_to_string(path).unwrap_or_else(|e| {
             eprintln!("error: cannot read '{file_path}': {e}");
             std::process::exit(1);
         });
+        // Use the file's parent directory for resolving relative image paths
+        path.canonicalize()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
     } else if edit_mode && stdin_is_terminal() {
         // No stdin input and no file, start with empty content
+        None
     } else {
         // Read from stdin
         io::stdin()
             .read_to_string(&mut markdown)
             .expect("Failed to read from stdin");
-    }
+        None
+    };
 
     // If edit mode, open editor
     if edit_mode {
@@ -183,7 +183,8 @@ fn main() {
     let html = parser::convert(&markdown);
 
     // Inline images (convert URLs to base64 data URIs)
-    let html = images::inline_images(&html, None);
+    // Use the markdown file's directory for resolving relative image paths
+    let html = images::inline_images(&html, base_path.as_deref());
 
     // Build full HTML document with CSS
     let markdown_css = include_str!("../assets/github-markdown.css");
