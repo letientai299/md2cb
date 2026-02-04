@@ -1,6 +1,7 @@
 //! GitHub Flavored Markdown to HTML converter using comrak.
 
-use comrak::{markdown_to_html, Options};
+use comrak::plugins::syntect::SyntectAdapterBuilder;
+use comrak::{markdown_to_html_with_plugins, Options, Plugins};
 use regex::Regex;
 
 use crate::js_runtime;
@@ -8,15 +9,43 @@ use crate::svg_render;
 
 /// Converts GitHub Flavored Markdown to HTML.
 pub fn convert(markdown: &str) -> String {
-    // Convert markdown to HTML using comrak with math support
+    // Build syntect adapter for syntax highlighting with inline styles
+    // Using the default "InspiredGitHub" theme which matches our GitHub-style output
+    let adapter = SyntectAdapterBuilder::new().build();
+
+    // Set up plugins with the syntax highlighter
+    let mut plugins = Plugins::default();
+    plugins.render.codefence_syntax_highlighter = Some(&adapter);
+
+    // Convert markdown to HTML using comrak with math support and syntax highlighting
     let options = build_options();
-    let html = markdown_to_html(markdown, &options);
+    let html = markdown_to_html_with_plugins(markdown, &options, &plugins);
 
     // Post-process: convert checkboxes to Unicode for compatibility
     let html = convert_checkboxes_to_unicode(&html);
 
     // Post-process: convert LaTeX in math spans to SVG using MathJax
-    convert_math_to_svg(&html)
+    let html = convert_math_to_svg(&html);
+
+    // Post-process: convert Mermaid code blocks to PNG images
+    // Note: must run BEFORE fix_pre_background_color so the regex matches
+    let html = convert_mermaid_to_png(&html);
+
+    // Post-process: fix background-color in pre tags for proper code block styling
+    // The syntect adapter adds white background which doesn't match GitHub styling
+    fix_pre_background_color(&html)
+}
+
+/// Replaces syntect's background-color in pre tags with GitHub's code block background.
+/// Syntect uses white (#ffffff) which doesn't match GitHub styling.
+/// We use GitHub's light-mode code block background (#f6f8fa) for better visibility.
+fn fix_pre_background_color(html: &str) -> String {
+    let re = Regex::new(r#"<pre style="background-color:#[0-9a-fA-F]+;">"#).unwrap();
+    re.replace_all(
+        html,
+        r#"<pre style="background-color:#f6f8fa;padding:16px;border-radius:6px;overflow:auto;">"#,
+    )
+    .to_string()
 }
 
 /// Converts HTML checkbox inputs to Unicode square symbols for better compatibility.
@@ -159,6 +188,88 @@ fn convert_math_to_svg(html: &str) -> String {
     result
 }
 
+/// Sanitizes SVG font-family attributes that contain unescaped quotes.
+/// mermaid-rs-renderer generates invalid SVG with unescaped quotes in font-family:
+/// font-family="Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif"
+/// This function replaces the entire font-family value with a clean version.
+fn sanitize_mermaid_svg(svg: &str) -> String {
+    // The problematic pattern is font-family="...stuff with "quotes" inside..."
+    // Rather than trying to parse the malformed XML, we'll do a simple string replacement
+    // of the known problematic font-family value
+    svg.replace(
+        r#"font-family="Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif""#,
+        r#"font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif""#,
+    )
+}
+
+/// Renders Mermaid diagram to PNG image tag.
+///
+/// This function:
+/// 1. Converts Mermaid definition to SVG using mermaid-rs-renderer (pure Rust)
+/// 2. Renders SVG to PNG using resvg (pure Rust)
+/// 3. Returns an HTML img tag with base64-encoded PNG
+fn mermaid_to_png(definition: &str) -> Result<String, String> {
+    // Step 1: Convert Mermaid definition to SVG using native Rust library
+    let svg = mermaid_rs_renderer::render(definition)
+        .map_err(|e| format!("Mermaid rendering error: {}", e))?;
+
+    // Step 1.5: Sanitize the SVG (fix invalid font-family attributes)
+    let svg = sanitize_mermaid_svg(&svg);
+
+    // Step 2: Render SVG to PNG using resvg
+    let render_result = svg_render::render_svg_to_png(&svg)?;
+
+    // Step 3: Build <img> tag with base64 PNG
+    let data_uri = format!("data:image/png;base64,{}", render_result.png_base64);
+    let alt = "Mermaid diagram";
+
+    Ok(format!(
+        r#"<img src="{}" alt="{}" width="{}" height="{}" style="display:block;margin:0.5em auto;">"#,
+        data_uri, alt, render_result.display_width, render_result.display_height
+    ))
+}
+
+/// Strips HTML span tags from content, preserving the text inside.
+/// Used to clean up syntect's syntax highlighting spans from mermaid content.
+fn strip_span_tags(html: &str) -> String {
+    let span_re = Regex::new(r#"</?span[^>]*>"#).unwrap();
+    span_re.replace_all(html, "").to_string()
+}
+
+/// Converts Mermaid code blocks to PNG images.
+///
+/// Comrak with syntect outputs mermaid code blocks as:
+/// `<pre style="..."><code class="language-mermaid"><span>...</span></code></pre>`
+///
+/// This function converts the Mermaid content to PNG images.
+fn convert_mermaid_to_png(html: &str) -> String {
+    // Match pre tags with optional style attributes (from syntect)
+    // The content may contain span tags from syntax highlighting
+    let mermaid_re = Regex::new(
+        r#"<pre[^>]*><code class="language-mermaid">([\s\S]*?)</code></pre>"#,
+    )
+    .unwrap();
+
+    mermaid_re
+        .replace_all(html, |caps: &regex::Captures| {
+            let definition_raw = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+            // Strip span tags added by syntect syntax highlighting
+            let definition_stripped = strip_span_tags(definition_raw);
+            let definition = decode_html_entities(&definition_stripped);
+            match mermaid_to_png(&definition) {
+                Ok(img) => format!(r#"<div class="mermaid-diagram">{img}</div>"#),
+                Err(e) => {
+                    eprintln!("Mermaid rendering error: {}", e);
+                    format!(
+                        r#"<pre class="mermaid-error"><code>{}</code></pre>"#,
+                        definition
+                    )
+                }
+            }
+        })
+        .to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -192,9 +303,15 @@ mod tests {
     #[test]
     fn test_code_blocks() {
         let result = convert("```rust\nfn main() {}\n```");
-        assert!(result.contains("<pre>"));
+        assert!(result.contains("<pre"));
         assert!(result.contains("<code"));
-        assert!(result.contains("fn main()"));
+        // Syntax highlighting splits tokens across spans, so check for individual parts
+        assert!(result.contains("fn "));
+        assert!(result.contains("main"));
+        // Check for syntax highlighting (inline styles)
+        assert!(result.contains("style="));
+        // Check for GitHub-style background color
+        assert!(result.contains("background-color:#f6f8fa"));
     }
 
     #[test]
@@ -306,4 +423,27 @@ $$"#);
         assert!(!result.contains("math-error"));
     }
 
+    #[test]
+    fn test_mermaid_flowchart() {
+        let result = convert("```mermaid\ngraph LR\n    A --> B\n```");
+        assert!(result.contains("mermaid-diagram"));
+        assert!(result.contains("<img"));
+        assert!(result.contains("data:image/png;base64"));
+    }
+
+    #[test]
+    fn test_mermaid_sequence_diagram() {
+        let result = convert("```mermaid\nsequenceDiagram\n    Alice->>Bob: Hello\n```");
+        assert!(result.contains("mermaid-diagram"));
+        assert!(result.contains("<img"));
+    }
+
+    #[test]
+    fn test_mermaid_complex_flowchart() {
+        let result = convert("```mermaid\ngraph TD\n    A[Start] --> B{Decision}\n    B -->|Yes| C[OK]\n    B -->|No| D[Cancel]\n```");
+        assert!(result.contains("mermaid-diagram"));
+        assert!(result.contains("<img"));
+        // Should NOT have error
+        assert!(!result.contains("mermaid-error"));
+    }
 }
