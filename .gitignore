@@ -5,3 +5,9 @@
 
 # Binary
 /md2cb
+
+# Node
+/node_modules
+
+# E2E test artifacts
+/e2e/screenshots/*.png

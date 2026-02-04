@@ -1,4 +1,4 @@
-.PHONY: build release debug clean dev dev-stop lint format test install
+.PHONY: build release debug clean dev dev-stop lint format test install e2e e2e-clean
 
 PREFIX ?= /usr/local
 EDITOR_PORT ?= 9090
@@ -53,3 +53,26 @@ dev: dev-stop
 dev-stop:
 	@-docker stop md2cb-editor >/dev/null 2>&1 || true
 	@-pkill -f "markserv.*$(MARKSERV_PORT)" 2>/dev/null || true
+
+# E2E Tests - run full suite or single test with FILTER=pattern
+# Usage: make e2e
+#        make e2e FILTER=01-basic
+#        make e2e FILTER=math
+e2e: build
+	@if ! docker ps --format '{{.Names}}' | grep -q md2cb-editor; then \
+		echo "Starting editor server..."; \
+		docker run -d --rm --name md2cb-editor -p $(EDITOR_PORT):80 -v $(PWD)/test:/usr/share/caddy:ro caddy:latest >/dev/null; \
+		sleep 1; \
+	fi
+	@echo "Running E2E tests..."
+	@if [ -n "$(FILTER)" ]; then \
+		node scripts/e2e-test.js "$(FILTER)"; \
+	else \
+		node scripts/e2e-test.js; \
+	fi
+
+# Clean E2E artifacts (screenshots and temporary files)
+e2e-clean:
+	@echo "Cleaning E2E artifacts..."
+	@rm -rf e2e/screenshots/*.png
+	@echo "Done."
