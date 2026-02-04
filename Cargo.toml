@@ -24,3 +24,7 @@ serde_json = "1"
 
 # Native Mermaid diagram rendering (no browser/Node.js needed)
 mermaid-rs-renderer = { git = "https://github.com/1jehuang/mermaid-rs-renderer", default-features = false }
+
+[profile.release]
+lto = true
+codegen-units = 1

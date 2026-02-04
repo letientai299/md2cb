@@ -5,16 +5,21 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::sync::LazyLock;
+
+// Static regex pattern for matching img tags
+static IMG_TAG_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"<img([^>]*)\ssrc="([^"]+)"([^>]*)>"#).unwrap()
+});
 
 /// Inlines all images in the HTML by converting URLs to base64 data URIs.
 /// This ensures pasted content contains the actual image data.
 pub fn inline_images(html: &str, base_path: Option<&Path>) -> String {
-    let img_re = Regex::new(r#"<img([^>]*)\ssrc="([^"]+)"([^>]*)>"#).unwrap();
     let mut result = html.to_string();
     let mut cache: HashMap<String, String> = HashMap::new();
 
     // Collect all matches first
-    let matches: Vec<_> = img_re
+    let matches: Vec<_> = IMG_TAG_RE
         .captures_iter(html)
         .map(|cap| {
             let full = cap.get(0).unwrap();

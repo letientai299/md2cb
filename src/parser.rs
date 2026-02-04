@@ -3,23 +3,59 @@
 use comrak::plugins::syntect::SyntectAdapterBuilder;
 use comrak::{markdown_to_html_with_plugins, Options, Plugins};
 use regex::Regex;
+use std::sync::LazyLock;
 
 use crate::js_runtime;
 use crate::svg_render;
 
+// Static regex patterns - compiled once and reused
+static PRE_BG_COLOR_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"<pre style="background-color:#[0-9a-fA-F]+;">"#).unwrap()
+});
+
+static CHECKED_CHECKBOX_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"<input[^>]*type="checkbox"[^>]*checked[^>]*/?\s*>"#).unwrap()
+});
+
+static UNCHECKED_CHECKBOX_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"<input[^>]*type="checkbox"[^>]*/?\s*>"#).unwrap()
+});
+
+static DISPLAY_MATH_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"<span data-math-style="display">([^<]*)</span>"#).unwrap()
+});
+
+static INLINE_MATH_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"<span data-math-style="inline">([^<]*)</span>"#).unwrap()
+});
+
+static MATH_CODE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"<pre><code class="language-math" data-math-style="display">([^<]*)</code></pre>"#).unwrap()
+});
+
+static MERMAID_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"<pre[^>]*><code class="language-mermaid">([\s\S]*?)</code></pre>"#).unwrap()
+});
+
+static SPAN_TAG_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"</?span[^>]*>"#).unwrap()
+});
+
+// Static comrak options - built once and reused
+static COMRAK_OPTIONS: LazyLock<Options> = LazyLock::new(build_options);
+
+// Static syntect adapter for syntax highlighting - built once and reused
+static SYNTECT_ADAPTER: LazyLock<comrak::plugins::syntect::SyntectAdapter> =
+    LazyLock::new(|| SyntectAdapterBuilder::new().build());
+
 /// Converts GitHub Flavored Markdown to HTML.
 pub fn convert(markdown: &str) -> String {
-    // Build syntect adapter for syntax highlighting with inline styles
-    // Using the default "InspiredGitHub" theme which matches our GitHub-style output
-    let adapter = SyntectAdapterBuilder::new().build();
-
-    // Set up plugins with the syntax highlighter
+    // Set up plugins with the cached syntax highlighter adapter
     let mut plugins = Plugins::default();
-    plugins.render.codefence_syntax_highlighter = Some(&adapter);
+    plugins.render.codefence_syntax_highlighter = Some(&*SYNTECT_ADAPTER);
 
     // Convert markdown to HTML using comrak with math support and syntax highlighting
-    let options = build_options();
-    let html = markdown_to_html_with_plugins(markdown, &options, &plugins);
+    let html = markdown_to_html_with_plugins(markdown, &COMRAK_OPTIONS, &plugins);
 
     // Post-process: convert checkboxes to Unicode for compatibility
     let html = convert_checkboxes_to_unicode(&html);
@@ -41,12 +77,11 @@ pub fn convert(markdown: &str) -> String {
 /// We use GitHub's light-mode code block background (#f6f8fa) for better visibility.
 /// Also adds monospace font-family for editors that strip CSS classes (e.g., Google Docs).
 fn fix_pre_background_color(html: &str) -> String {
-    let re = Regex::new(r#"<pre style="background-color:#[0-9a-fA-F]+;">"#).unwrap();
-    re.replace_all(
+    PRE_BG_COLOR_RE.replace_all(
         html,
         r#"<pre style="background-color:#f6f8fa;padding:16px;border-radius:6px;overflow:auto;font-family:monospace;">"#,
     )
-    .to_string()
+    .into_owned()
 }
 
 /// Converts HTML checkbox inputs to Unicode square symbols for better compatibility.
@@ -54,12 +89,10 @@ fn fix_pre_background_color(html: &str) -> String {
 /// - Unchecked: ⬜ (U+2B1C WHITE LARGE SQUARE)
 fn convert_checkboxes_to_unicode(html: &str) -> String {
     // Match checked checkbox (has "checked" attribute)
-    let checked_re = Regex::new(r#"<input[^>]*type="checkbox"[^>]*checked[^>]*/?\s*>"#).unwrap();
-    let result = checked_re.replace_all(html, "✅ ");
+    let result = CHECKED_CHECKBOX_RE.replace_all(html, "✅ ");
 
     // Match unchecked checkbox (no "checked" attribute)
-    let unchecked_re = Regex::new(r#"<input[^>]*type="checkbox"[^>]*/?\s*>"#).unwrap();
-    unchecked_re.replace_all(&result, "⬜ ").to_string()
+    UNCHECKED_CHECKBOX_RE.replace_all(&result, "⬜ ").into_owned()
 }
 
 /// Builds comrak options with GFM extensions enabled.
@@ -87,12 +120,19 @@ fn build_options() -> Options {
 
 /// Decodes HTML entities in LaTeX content.
 /// Comrak HTML-encodes content, but MathJax needs raw LaTeX.
-fn decode_html_entities(s: &str) -> String {
-    s.replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&#39;", "'")
+fn decode_html_entities(s: &str) -> std::borrow::Cow<'_, str> {
+    // Fast path: if no entities present, return borrowed reference
+    if !s.contains('&') {
+        return std::borrow::Cow::Borrowed(s);
+    }
+    // Slow path: decode entities
+    std::borrow::Cow::Owned(
+        s.replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'"),
+    )
 }
 
 /// Renders LaTeX to PNG image tag using embedded MathJax + resvg.
@@ -131,13 +171,9 @@ fn latex_to_svg(latex: &str, display: bool) -> Result<String, String> {
 ///
 /// This function converts the LaTeX content to inline SVG.
 fn convert_math_to_svg(html: &str) -> String {
-    let mut result = html.to_string();
-
     // Match display math spans
-    let display_re =
-        Regex::new(r#"<span data-math-style="display">([^<]*)</span>"#).unwrap();
-    result = display_re
-        .replace_all(&result, |caps: &regex::Captures| {
+    let result = DISPLAY_MATH_RE
+        .replace_all(html, |caps: &regex::Captures| {
             let latex_raw = caps.get(1).map(|m| m.as_str()).unwrap_or("");
             let latex = decode_html_entities(latex_raw);
             match latex_to_svg(&latex, true) {
@@ -147,13 +183,10 @@ fn convert_math_to_svg(html: &str) -> String {
                     latex
                 ),
             }
-        })
-        .to_string();
+        });
 
     // Match inline math spans
-    let inline_re =
-        Regex::new(r#"<span data-math-style="inline">([^<]*)</span>"#).unwrap();
-    result = inline_re
+    let result = INLINE_MATH_RE
         .replace_all(&result, |caps: &regex::Captures| {
             let latex_raw = caps.get(1).map(|m| m.as_str()).unwrap_or("");
             let latex = decode_html_entities(latex_raw);
@@ -164,15 +197,10 @@ fn convert_math_to_svg(html: &str) -> String {
                     latex
                 ),
             }
-        })
-        .to_string();
+        });
 
     // Also handle math code blocks (```math)
-    let code_re = Regex::new(
-        r#"<pre><code class="language-math" data-math-style="display">([^<]*)</code></pre>"#,
-    )
-    .unwrap();
-    result = code_re
+    MATH_CODE_RE
         .replace_all(&result, |caps: &regex::Captures| {
             let latex_raw = caps.get(1).map(|m| m.as_str()).unwrap_or("").trim();
             let latex = decode_html_entities(latex_raw);
@@ -184,9 +212,7 @@ fn convert_math_to_svg(html: &str) -> String {
                 ),
             }
         })
-        .to_string();
-
-    result
+        .into_owned()
 }
 
 /// Sanitizes SVG font-family attributes that contain unescaped quotes.
@@ -233,8 +259,7 @@ fn mermaid_to_png(definition: &str) -> Result<String, String> {
 /// Strips HTML span tags from content, preserving the text inside.
 /// Used to clean up syntect's syntax highlighting spans from mermaid content.
 fn strip_span_tags(html: &str) -> String {
-    let span_re = Regex::new(r#"</?span[^>]*>"#).unwrap();
-    span_re.replace_all(html, "").to_string()
+    SPAN_TAG_RE.replace_all(html, "").into_owned()
 }
 
 /// Converts Mermaid code blocks to PNG images.
@@ -244,14 +269,7 @@ fn strip_span_tags(html: &str) -> String {
 ///
 /// This function converts the Mermaid content to PNG images.
 fn convert_mermaid_to_png(html: &str) -> String {
-    // Match pre tags with optional style attributes (from syntect)
-    // The content may contain span tags from syntax highlighting
-    let mermaid_re = Regex::new(
-        r#"<pre[^>]*><code class="language-mermaid">([\s\S]*?)</code></pre>"#,
-    )
-    .unwrap();
-
-    mermaid_re
+    MERMAID_RE
         .replace_all(html, |caps: &regex::Captures| {
             let definition_raw = caps.get(1).map(|m| m.as_str()).unwrap_or("");
             // Strip span tags added by syntect syntax highlighting
@@ -268,7 +286,7 @@ fn convert_mermaid_to_png(html: &str) -> String {
                 }
             }
         })
-        .to_string()
+        .into_owned()
 }
 
 #[cfg(test)]

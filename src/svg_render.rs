@@ -41,8 +41,10 @@ pub struct SvgRenderResult {
 /// display dimensions are the original size.
 pub fn render_svg_to_png(svg_content: &str) -> Result<SvgRenderResult, String> {
     // Parse SVG with font database for text rendering
-    let mut opts = Options::default();
-    opts.fontdb = get_font_db();
+    let opts = Options {
+        fontdb: get_font_db(),
+        ..Default::default()
+    };
     let tree = Tree::from_str(svg_content, &opts)
         .map_err(|e| format!("SVG parse error: {}", e))?;
 
