@@ -1,4 +1,4 @@
-.PHONY: build release debug install clean dev dev-stop
+.PHONY: build release debug clean dev dev-stop lint format test
 
 PREFIX ?= /usr/local
 EDITOR_PORT ?= 9090
@@ -9,9 +9,39 @@ build: release
 release:
 	swift build -c release
 
+debug:
+	swift build
+
 clean:
 	swift package clean
 	rm -rf .build
+
+test:
+	swift test
+
+lint:
+	@if command -v swiftlint >/dev/null 2>&1; then \
+		swiftlint lint --strict; \
+	else \
+		echo "SwiftLint not installed. Install with: brew install swiftlint"; \
+		exit 1; \
+	fi
+
+format:
+	@if command -v swiftformat >/dev/null 2>&1; then \
+		swiftformat .; \
+	else \
+		echo "SwiftFormat not installed. Install with: brew install swiftformat"; \
+		exit 1; \
+	fi
+
+format-check:
+	@if command -v swiftformat >/dev/null 2>&1; then \
+		swiftformat --lint .; \
+	else \
+		echo "SwiftFormat not installed. Install with: brew install swiftformat"; \
+		exit 1; \
+	fi
 
 dev: dev-stop
 	@echo "Starting dev servers..."
