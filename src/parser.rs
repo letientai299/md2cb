@@ -39,11 +39,12 @@ pub fn convert(markdown: &str) -> String {
 /// Replaces syntect's background-color in pre tags with GitHub's code block background.
 /// Syntect uses white (#ffffff) which doesn't match GitHub styling.
 /// We use GitHub's light-mode code block background (#f6f8fa) for better visibility.
+/// Also adds monospace font-family for editors that strip CSS classes (e.g., Google Docs).
 fn fix_pre_background_color(html: &str) -> String {
     let re = Regex::new(r#"<pre style="background-color:#[0-9a-fA-F]+;">"#).unwrap();
     re.replace_all(
         html,
-        r#"<pre style="background-color:#f6f8fa;padding:16px;border-radius:6px;overflow:auto;">"#,
+        r#"<pre style="background-color:#f6f8fa;padding:16px;border-radius:6px;overflow:auto;font-family:monospace;">"#,
     )
     .to_string()
 }
