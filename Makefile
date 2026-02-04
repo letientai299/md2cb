@@ -1,47 +1,42 @@
-.PHONY: build release debug clean dev dev-stop lint format test
+.PHONY: build release debug clean dev dev-stop lint format test install
 
 PREFIX ?= /usr/local
 EDITOR_PORT ?= 9090
 MARKSERV_PORT ?= 9091
 
 build: release
+	@cp target/release/md2cb ./md2cb
 
 release:
-	swift build -c release
+	cargo build --release
 
 debug:
-	swift build
+	cargo build
 
 clean:
-	swift package clean
-	rm -rf .build
+	cargo clean
+	rm -f ./md2cb
 
 test:
-	swift test
+	cargo test
 
 lint:
-	@if command -v swiftlint >/dev/null 2>&1; then \
-		swiftlint lint --strict; \
+	@if command -v cargo-clippy >/dev/null 2>&1; then \
+		cargo clippy -- -D warnings; \
 	else \
-		echo "SwiftLint not installed. Install with: brew install swiftlint"; \
+		echo "Clippy not installed. Install with: rustup component add clippy"; \
 		exit 1; \
 	fi
 
 format:
-	@if command -v swiftformat >/dev/null 2>&1; then \
-		swiftformat .; \
-	else \
-		echo "SwiftFormat not installed. Install with: brew install swiftformat"; \
-		exit 1; \
-	fi
+	cargo fmt
 
 format-check:
-	@if command -v swiftformat >/dev/null 2>&1; then \
-		swiftformat --lint .; \
-	else \
-		echo "SwiftFormat not installed. Install with: brew install swiftformat"; \
-		exit 1; \
-	fi
+	cargo fmt -- --check
+
+install: release
+	install -d $(PREFIX)/bin
+	install target/release/md2cb $(PREFIX)/bin/
 
 dev: dev-stop
 	@echo "Starting dev servers..."

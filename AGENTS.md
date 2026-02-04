@@ -2,10 +2,9 @@
 
 ## Project Purpose
 
-`md2cb` is a macOS command-line tool that converts GitHub Flavored Markdown
-(GFM) to rich HTML clipboard content. The goal is to produce clipboard output
-identical to what a browser produces when copying rendered markdown—with full
-computed inline styles.
+`md2cb` is a cross-platform command-line tool that converts GitHub Flavored
+Markdown (GFM) to rich HTML clipboard content. The goal is to produce clipboard
+output that rich text editors can properly render with GitHub-style formatting.
 
 This enables users to paste formatted markdown into rich text editors like
 Microsoft Word, Teams, Slack, Google Docs, Apple Pages, etc., with proper
@@ -13,30 +12,40 @@ styling preserved.
 
 ## Architecture
 
-The tool uses a WebKit-based approach:
+The tool is written in Rust for cross-platform support (macOS, Windows, Linux):
 
-1. **Markdown → HTML**: Custom parser converts GFM to HTML
-2. **HTML → Rendered**: WebKit renders HTML with GitHub-style CSS
-3. **Rendered → Clipboard**: WebKit's native copy
-   (`document.execCommand('copy')`) captures computed styles
+1. **Markdown → HTML**: Custom regex-based parser converts GFM to HTML
+2. **CSS Embedding**: GitHub markdown CSS is embedded at compile time
+3. **Clipboard**: Uses `arboard` crate for cross-platform HTML clipboard support
 
-This approach ensures the clipboard content matches browser behavior exactly.
+### Source Structure
+
+```
+src/
+├── main.rs        # Entry point, reads stdin, builds HTML document
+├── parser.rs      # GFM to HTML converter with full test suite
+└── clipboard.rs   # Cross-platform clipboard operations
+
+assets/
+└── github-markdown.css  # GitHub's official markdown CSS (embedded at compile)
+```
 
 ## Development
 
 ### Prerequisites
 
-- macOS 13+
-- Swift 5.9+
-- Docker
-- pnpm
+- Rust 1.70+ (install via rustup)
+- Docker (for dev server)
+- pnpm (for markserv)
 
 ### Make targets
 
 ```bash
 make          # Build release binary
+make test     # Run tests
 make dev      # Start dev servers and open in browser
 make dev-stop # Stop servers
+make install  # Install to /usr/local/bin
 ```
 
 - **http://localhost:9090** - Rich text editor (Froala) for paste testing
@@ -44,11 +53,25 @@ make dev-stop # Stop servers
 
 ### Workflow
 
-1. Edit `Sources/md2cb/md2cb.swift`
+1. Edit `src/parser.rs` or other source files
 2. Run `make` to rebuild
 3. Test with `cat test/demo.md | ./md2cb`
 4. Paste into the editor at localhost:9090 to verify output
-5. Double verify with Playwright MCP
+5. Run `make test` to ensure all tests pass
+
+## Supported Markdown Features
+
+- Headers (H1-H6)
+- Tables with column alignment (left/center/right)
+- Task lists (checkboxes)
+- Nested lists (ordered and unordered)
+- Fenced code blocks with language classes
+- Blockquotes
+- Horizontal rules
+- Links (inline, reference-style, auto-links)
+- Images with alt text and title
+- Bold, italic, strikethrough, inline code
+- HTML passthrough
 
 ## Testing with Playwright
 
@@ -61,48 +84,29 @@ output.
 2. **md2cb output**: Run `cat test/demo.md | ./md2cb`
 3. **Compare**: Paste both into the editor and compare HTML structure
 
-### Example Playwright Test
-
-```javascript
-import { test, expect } from "@playwright/test";
-
-test("md2cb matches browser clipboard", async ({ page, context }) => {
-  // Grant clipboard permissions
-  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-
-  // Get browser clipboard content
-  await page.goto("http://localhost:9091/demo.md");
-  await page.keyboard.press("Meta+a");
-  await page.keyboard.press("Meta+c");
-  const browserClipboard = await page.evaluate(() =>
-    navigator.clipboard.readText(),
-  );
-
-  // Get md2cb clipboard content (run externally, then read)
-  // ... execute: cat test/demo.md | ./md2cb
-
-  // Paste into editor and verify
-  await page.goto("http://localhost:9090");
-  await page.click(".fr-element"); // Froala editor
-  await page.keyboard.press("Meta+v");
-
-  // Assert expected elements are present
-  await expect(page.locator("table")).toBeVisible();
-  await expect(page.locator("h1")).toContainText("GFM Feature Demos");
-});
-```
-
 ## Common Issues
 
 ### Nested lists not working
 
-Check `handleListItem()` indent tracking logic.
+Check `handle_list_item()` indent tracking logic in `src/parser.rs`.
 
 ### HTML tags stripped
 
-Ensure they're not being escaped in `convertParagraphs()` or
-`convertInlineElements()`.
+Ensure they're not being escaped in `convert_paragraphs()` or
+`convert_inline_elements()`.
 
 ### Styles not applied
 
-Verify CSS in `Styles.css` and that WebKit is fully rendering before copy.
+Verify CSS in `assets/github-markdown.css` is being properly embedded. The CSS
+uses CSS variables for theming - ensure the target editor supports them.
+
+## Custom CSS
+
+The CSS file at `assets/github-markdown.css` is from the `github-markdown-css`
+npm package. To update or customize:
+
+1. Download new CSS from https://github.com/sindresorhus/github-markdown-css
+2. Replace `assets/github-markdown.css`
+3. Rebuild with `make`
+
+The CSS is embedded at compile time using `include_str!()`.

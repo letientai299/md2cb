@@ -1,10 +1,8 @@
 # md2cb
 
-Markdown to clipboard converter for macOS. Converts GFM markdown to rich HTML
-and copies to clipboard for pasting into Word, Google Docs, Pages, etc.
-
-Uses WebKit to render markdown with GitHub-style CSS, producing clipboard
-content identical to browser copy behavior.
+Markdown to clipboard converter. Converts GitHub Flavored Markdown (GFM) to rich
+HTML and copies it to the system clipboard for pasting into Word, Google Docs,
+Pages, etc.
 
 ## Usage
 
@@ -31,14 +29,13 @@ md2cb < file.md
 ## Project Structure
 
 ```
-md2cb-swift/
-├── Sources/md2cb/
-│   └── md2cb.swift    # Main source file
-├── test/
-│   ├── demo.md        # Test markdown file
-│   └── index.html     # Rich text editor for paste testing
-├── Makefile
-└── Package.swift
+src/
+├── main.rs        # Entry point, reads stdin, builds HTML document
+├── parser.rs      # GFM to HTML converter with tests
+└── clipboard.rs   # Cross-platform clipboard operations
+
+assets/
+└── github-markdown.css  # Embedded GitHub CSS
 ```
 
 ## Build
@@ -60,7 +57,6 @@ make dev-stop     # Stop test servers
 
 ## Requirements
 
-- macOS 13+
-- Swift 5.9+
+- Rust 1.70+
 - Docker (for dev server)
 - pnpm (for markserv)

@@ -1,0 +1,11 @@
+[package]
+name = "md2cb"
+version = "0.1.0"
+edition = "2024"
+description = "Convert GitHub Flavored Markdown to rich HTML clipboard content"
+license = "MIT"
+
+[dependencies]
+arboard = "3"
+regex = "1"
+fancy-regex = "0.14"

@@ -36,7 +36,7 @@ const greet = () => console.log("Hello!");
 
 Auto link: https://github.com
 
-[Inline](https.google.com) and [anchor][gg].
+[Inline](https://google.com) and [anchor][gg].
 
 ![pic alt](./haru.png "avatar")
 
