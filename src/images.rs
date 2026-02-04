@@ -219,4 +219,62 @@ mod tests {
         fs::remove_dir_all(&test_dir).ok();
         fs::remove_dir_all(&other_dir).ok();
     }
+
+    #[test]
+    fn test_guess_mime_type() {
+        assert_eq!(guess_mime_type(Path::new("test.png")), "image/png");
+        assert_eq!(guess_mime_type(Path::new("test.jpg")), "image/jpeg");
+        assert_eq!(guess_mime_type(Path::new("test.jpeg")), "image/jpeg");
+        assert_eq!(guess_mime_type(Path::new("test.gif")), "image/gif");
+        assert_eq!(guess_mime_type(Path::new("test.webp")), "image/webp");
+        assert_eq!(guess_mime_type(Path::new("test.svg")), "image/svg+xml");
+        assert_eq!(guess_mime_type(Path::new("test.ico")), "image/x-icon");
+        assert_eq!(guess_mime_type(Path::new("test.bmp")), "image/bmp");
+        assert_eq!(guess_mime_type(Path::new("test.unknown")), "image/png");
+        assert_eq!(guess_mime_type(Path::new("test")), "image/png");
+    }
+
+    #[test]
+    fn test_path_traversal_prevention() {
+        // Setup:
+        // /tmp/md2cb_test_traversal/base/
+        // /tmp/md2cb_test_traversal/secret.txt
+        let root_dir = std::env::temp_dir().join("md2cb_test_traversal");
+        let base_dir = root_dir.join("base");
+        fs::create_dir_all(&base_dir).unwrap();
+        
+        let secret_path = root_dir.join("secret.png");
+        fs::write(&secret_path, PNG_BYTES).unwrap();
+
+        // Try to access ../secret.png
+        let result = fetch_local_image("../secret.png", Some(&base_dir));
+        assert!(result.is_none(), "Should block path traversal");
+
+        // Cleanup
+        fs::remove_dir_all(&root_dir).ok();
+    }
+
+    #[test]
+    fn test_fetch_local_image_no_base_path() {
+        // When base_path is None, it should resolve relative to current directory
+        // We'll create a file in the current directory (or temp dir and chdir?)
+        // Changing CWD in tests is bad (parallelism).
+        // But fetch_local_image with None uses Path::new(path).to_path_buf().
+        // If we give an absolute path, it should work.
+        
+        let test_dir = std::env::temp_dir().join("md2cb_test_nobase");
+        fs::create_dir_all(&test_dir).unwrap();
+        let img_path = test_dir.join("nobase.png");
+        fs::write(&img_path, PNG_BYTES).unwrap();
+
+        let path_str = img_path.to_string_lossy();
+        let result = fetch_local_image(&path_str, None);
+        
+        assert!(result.is_some(), "Should work with absolute path and no base_path");
+        let uri = result.unwrap();
+        assert!(uri.starts_with("data:image/png;base64,"));
+
+        // Cleanup
+        fs::remove_dir_all(&test_dir).ok();
+    }
 }

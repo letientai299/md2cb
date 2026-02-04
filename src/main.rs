@@ -97,53 +97,132 @@ fn edit_in_editor(initial_content: &str) -> Result<String, String> {
     Ok(content)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_args_help() {
+        let args = vec!["--help".to_string()];
+        let config = parse_args(&args).unwrap();
+        assert!(config.show_help);
+    }
+
+    #[test]
+    fn test_parse_args_version() {
+        let args = vec!["-V".to_string()];
+        let config = parse_args(&args).unwrap();
+        assert!(config.show_version);
+    }
+
+    #[test]
+    fn test_parse_args_edit() {
+        let args = vec!["--edit".to_string()];
+        let config = parse_args(&args).unwrap();
+        assert!(config.edit_mode);
+    }
+
+    #[test]
+    fn test_parse_args_file() {
+        let args = vec!["readme.md".to_string()];
+        let config = parse_args(&args).unwrap();
+        assert_eq!(config.input_file.as_deref(), Some("readme.md"));
+    }
+
+    #[test]
+    fn test_parse_args_file_and_edit() {
+        let args = vec!["-e".to_string(), "readme.md".to_string()];
+        let config = parse_args(&args).unwrap();
+        assert!(config.edit_mode);
+        assert_eq!(config.input_file.as_deref(), Some("readme.md"));
+    }
+
+    #[test]
+    fn test_parse_args_unknown_option() {
+        let args = vec!["--foo".to_string()];
+        let err = parse_args(&args).unwrap_err();
+        assert!(err.contains("unknown option"));
+    }
+
+    #[test]
+    fn test_parse_args_too_many_args() {
+        let args = vec!["file1".to_string(), "file2".to_string()];
+        let err = parse_args(&args).unwrap_err();
+        assert!(err.contains("too many arguments"));
+    }
+
+    #[test]
+    fn test_temp_file_path() {
+        let path = temp_file_path();
+        assert!(path.extension().unwrap() == "md");
+        assert!(path.to_string_lossy().contains("md2cb-"));
+    }
+}
+
 /// Check if stdin is a terminal (no piped input)
 fn stdin_is_terminal() -> bool {
     use std::io::IsTerminal;
     std::io::stdin().is_terminal()
 }
 
+fn parse_args(args: &[String]) -> Result<Config, String> {
+    let mut config = Config::default();
+    let mut positional = Vec::new();
+
+    for arg in args {
+        match arg.as_str() {
+            "--help" | "-h" => config.show_help = true,
+            "--version" | "-V" => config.show_version = true,
+            "--edit" | "-e" => config.edit_mode = true,
+            s if s.starts_with('-') => return Err(format!("unknown option '{s}'")),
+            _ => positional.push(arg.clone()),
+        }
+    }
+
+    if positional.len() > 1 {
+        return Err("too many arguments".to_string());
+    }
+
+    config.input_file = positional.first().cloned();
+    Ok(config)
+}
+
+#[derive(Default, Debug, PartialEq)]
+struct Config {
+    input_file: Option<String>,
+    edit_mode: bool,
+    show_help: bool,
+    show_version: bool,
+}
+
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
+    
+    let config = match parse_args(&args) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("error: {e}");
+            eprintln!("Usage: md2cb [OPTIONS] [FILE]");
+            eprintln!("Try 'md2cb --help' for more information.");
+            std::process::exit(1);
+        }
+    };
 
     // Handle --help
-    if args.iter().any(|a| a == "--help" || a == "-h") {
+    if config.show_help {
         print_help();
         return;
     }
 
     // Handle --version
-    if args.iter().any(|a| a == "--version" || a == "-V") {
+    if config.show_version {
         print_version();
         return;
     }
 
-    // Check for --edit flag
-    let edit_mode = args.iter().any(|a| a == "--edit" || a == "-e");
-
-    // Check for unknown flags
-    for arg in &args {
-        if arg.starts_with('-') && arg != "-e" && arg != "--edit" {
-            eprintln!("error: unknown option '{arg}'");
-            eprintln!("Usage: md2cb [OPTIONS] [FILE]");
-            eprintln!("Try 'md2cb --help' for more information.");
-            std::process::exit(1);
-        }
-    }
-
-    // Get positional arguments (file path)
-    let positional: Vec<_> = args.iter().filter(|a| !a.starts_with('-')).collect();
-
-    // Only one file argument allowed
-    if positional.len() > 1 {
-        eprintln!("error: too many arguments");
-        eprintln!("Usage: md2cb [OPTIONS] [FILE]");
-        eprintln!("Try 'md2cb --help' for more information.");
-        std::process::exit(1);
-    }
-
-    let input_file = positional.first().map(|s| s.as_str());
-
+    let input_file = config.input_file.as_deref();
+    let edit_mode = config.edit_mode;
+    
     // Read markdown content and track base path for relative image resolution
     let mut markdown = String::new();
     let base_path: Option<std::path::PathBuf> = if let Some(file_path) = input_file {
