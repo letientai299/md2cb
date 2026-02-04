@@ -4,6 +4,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
+use std::io::Read;
 use std::path::Path;
 use std::sync::LazyLock;
 
@@ -76,7 +77,12 @@ fn fetch_remote_image(url: &str) -> Option<String> {
 
     // Read response body
     let mut bytes = Vec::new();
-    response.into_reader().read_to_end(&mut bytes).ok()?;
+    // Limit to 10MB to prevent memory exhaustion
+    response
+        .into_reader()
+        .take(10 * 1024 * 1024)
+        .read_to_end(&mut bytes)
+        .ok()?;
 
     let encoded = STANDARD.encode(&bytes);
     Some(format!("data:{content_type};base64,{encoded}"))
@@ -85,7 +91,21 @@ fn fetch_remote_image(url: &str) -> Option<String> {
 /// Reads a local image file and encodes as data URI.
 fn fetch_local_image(path: &str, base_path: Option<&Path>) -> Option<String> {
     let full_path = if let Some(base) = base_path {
-        base.join(path)
+        let full = base.join(path);
+        // If path is absolute, we allow it (as per existing tests/behavior).
+        // We only restrict relative paths to stay within the base directory.
+        if Path::new(path).is_absolute() {
+            full
+        } else {
+            // Prevent path traversal for relative paths
+            let canonical_base = base.canonicalize().ok()?;
+            let canonical_full = full.canonicalize().ok()?;
+            
+            if !canonical_full.starts_with(&canonical_base) {
+                return None;
+            }
+            full
+        }
     } else {
         Path::new(path).to_path_buf()
     };

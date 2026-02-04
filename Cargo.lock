@@ -890,7 +890,6 @@ dependencies = [
  "arboard",
  "base64",
  "comrak",
- "libc",
  "mermaid-rs-renderer",
  "regex",
  "resvg",

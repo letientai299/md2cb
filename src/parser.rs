@@ -135,6 +135,16 @@ fn decode_html_entities(s: &str) -> std::borrow::Cow<'_, str> {
     )
 }
 
+/// HTML-escapes a string.
+fn html_escape(s: impl AsRef<str>) -> String {
+    let s = s.as_ref();
+    s.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&#39;")
+}
+
 /// Renders LaTeX to PNG image tag using embedded MathJax + resvg.
 ///
 /// This function:
@@ -180,7 +190,7 @@ fn convert_math_to_svg(html: &str) -> String {
                 Ok(svg) => format!(r#"<div class="math math-display">{svg}</div>"#),
                 Err(_) => format!(
                     r#"<div class="math math-display math-error">$${}$$</div>"#,
-                    latex
+                    html_escape(latex)
                 ),
             }
         });
@@ -194,7 +204,7 @@ fn convert_math_to_svg(html: &str) -> String {
                 Ok(svg) => format!(r#"<span class="math math-inline">{svg}</span>"#),
                 Err(_) => format!(
                     r#"<span class="math math-inline math-error">${}$</span>"#,
-                    latex
+                    html_escape(latex)
                 ),
             }
         });
@@ -208,7 +218,7 @@ fn convert_math_to_svg(html: &str) -> String {
                 Ok(svg) => format!(r#"<div class="math math-display">{svg}</div>"#),
                 Err(_) => format!(
                     r#"<div class="math math-display math-error">$${}$$</div>"#,
-                    latex
+                    html_escape(latex)
                 ),
             }
         })
@@ -281,7 +291,7 @@ fn convert_mermaid_to_png(html: &str) -> String {
                     eprintln!("Mermaid rendering error: {}", e);
                     format!(
                         r#"<pre class="mermaid-error"><code>{}</code></pre>"#,
-                        definition
+                        html_escape(definition)
                     )
                 }
             }

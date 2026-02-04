@@ -57,6 +57,15 @@ pub fn render_svg_to_png(svg_content: &str) -> Result<SvgRenderResult, String> {
     let render_width = (base_width * RENDER_SCALE).ceil() as u32;
     let render_height = (base_height * RENDER_SCALE).ceil() as u32;
 
+    // Prevent excessive memory allocation (e.g. max 8K x 8K)
+    const MAX_DIMENSION: u32 = 8192;
+    if render_width > MAX_DIMENSION || render_height > MAX_DIMENSION {
+        return Err(format!(
+            "SVG dimensions too large: {}x{}",
+            render_width, render_height
+        ));
+    }
+
     // Display dimensions (what the user sees)
     let display_width = base_width.ceil() as u32;
     let display_height = base_height.ceil() as u32;

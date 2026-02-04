@@ -99,8 +99,8 @@ fn edit_in_editor(initial_content: &str) -> Result<String, String> {
 
 /// Check if stdin is a terminal (no piped input)
 fn stdin_is_terminal() -> bool {
-    use std::os::unix::io::AsRawFd;
-    unsafe { libc::isatty(io::stdin().as_raw_fd()) != 0 }
+    use std::io::IsTerminal;
+    std::io::stdin().is_terminal()
 }
 
 fn main() {

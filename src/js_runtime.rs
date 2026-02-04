@@ -93,6 +93,8 @@ fn escape_js_string(s: &str) -> String {
             '\n' => result.push_str("\\n"),
             '\r' => result.push_str("\\r"),
             '\t' => result.push_str("\\t"),
+            '\u{2028}' => result.push_str("\\u2028"),
+            '\u{2029}' => result.push_str("\\u2029"),
             _ => result.push(c),
         }
     }
