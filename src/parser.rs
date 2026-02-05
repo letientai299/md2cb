@@ -35,6 +35,16 @@ static MERMAID_RE: LazyLock<Regex> = LazyLock::new(|| {
 
 static SPAN_TAG_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"</?span[^>]*>"#).unwrap());
 
+// Match code blocks for newline conversion (pre tag with code inside)
+static CODE_BLOCK_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(<pre[^>]*><code[^>]*>)([\s\S]*?)(</code></pre>)"#).unwrap()
+});
+
+// Match whitespace between block-level tags (should be removed, not converted to space)
+static BLOCK_TAG_WHITESPACE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r">\s+<").unwrap()
+});
+
 // Static comrak options - built once and reused
 static COMRAK_OPTIONS: LazyLock<Options> = LazyLock::new(build_options);
 
@@ -63,7 +73,25 @@ pub fn convert(markdown: &str) -> String {
 
     // Post-process: fix background-color in pre tags for proper code block styling
     // The syntect adapter adds white background which doesn't match GitHub styling
-    fix_pre_background_color(&html)
+    let html = fix_pre_background_color(&html);
+
+    // Post-process: convert newlines to <br> in code blocks for Teams compatibility
+    let html = convert_code_block_newlines(&html);
+
+    // Post-process: convert remaining newlines to spaces for rich text editor compatibility
+    // (code blocks already have newlines converted to <br>, so this only affects regular content)
+    normalize_whitespace(&html)
+}
+
+/// Normalizes whitespace in HTML content.
+/// - Removes whitespace between HTML tags (block-level structure)
+/// - Converts newlines within text content to spaces (inline text wrapping)
+/// Code blocks are unaffected since their newlines have already been converted to `<br>` tags.
+fn normalize_whitespace(html: &str) -> String {
+    // First, remove whitespace between tags (preserves block structure without gaps)
+    let collapsed = BLOCK_TAG_WHITESPACE_RE.replace_all(html, "><");
+    // Then replace any remaining newlines (within text content) with spaces
+    collapsed.replace('\n', " ")
 }
 
 /// Replaces syntect's background-color in pre tags with GitHub's code block background.
@@ -76,6 +104,27 @@ fn fix_pre_background_color(html: &str) -> String {
         r#"<pre style="background-color:#f6f8fa;padding:16px;border-radius:6px;overflow:auto;font-family:monospace;">"#,
     )
     .into_owned()
+}
+
+/// Converts newlines to `<br>` tags inside code blocks.
+/// This ensures line breaks are preserved when pasting into rich text editors
+/// like Microsoft Teams, which may strip plain newlines.
+fn convert_code_block_newlines(html: &str) -> String {
+    CODE_BLOCK_RE
+        .replace_all(html, |caps: &regex::Captures| {
+            let pre_open = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+            let content = caps.get(2).map(|m| m.as_str()).unwrap_or("");
+            let close = caps.get(3).map(|m| m.as_str()).unwrap_or("");
+            // Replace newlines with <br> to preserve line breaks in rich text editors
+            let content_with_br = content.replace('\n', "<br>");
+            // Remove trailing <br> that appears before </span></code> (from fenced code block syntax)
+            let content_trimmed = content_with_br
+                .strip_suffix("<br></span>")
+                .map(|s| format!("{s}</span>"))
+                .unwrap_or(content_with_br);
+            format!("{pre_open}{content_trimmed}{close}")
+        })
+        .into_owned()
 }
 
 /// Converts HTML checkbox inputs to Unicode square symbols for better compatibility.
@@ -478,5 +527,101 @@ $$"#,
         assert!(result.contains("<img"));
         // Should NOT have error
         assert!(!result.contains("mermaid-error"));
+    }
+
+    #[test]
+    fn test_code_block_newlines_converted_to_br() {
+        let result = convert("```rust\nfn main() {\n    println!(\"Hello\");\n}\n```");
+        assert!(result.contains("<pre"));
+        assert!(result.contains("<code"));
+        // Should have <br> tags instead of plain newlines inside code block
+        assert!(result.contains("<br>"));
+        // The code content should still be present
+        assert!(result.contains("main"));
+        assert!(result.contains("println"));
+    }
+
+    #[test]
+    fn test_code_block_multiline_preserves_structure() {
+        let result = convert("```python\ndef hello():\n    print('world')\n\nhello()\n```");
+        // Count <br> occurrences - should have at least 3 (one per newline in code)
+        let br_count = result.matches("<br>").count();
+        assert!(
+            br_count >= 3,
+            "Expected at least 3 <br> tags, got {br_count}"
+        );
+    }
+
+    #[test]
+    fn test_code_block_no_trailing_br() {
+        let result = convert("```rust\nfn main() {}\n```");
+        // Should NOT have trailing <br> before </span></code>
+        assert!(
+            !result.contains("<br></span></code>"),
+            "Should not have trailing <br> before closing tags"
+        );
+        // But should still have the code content
+        assert!(result.contains("main"));
+    }
+
+    #[test]
+    fn test_normalize_whitespace_removes_between_tags() {
+        // Whitespace between closing and opening tags should be removed
+        let html = "<ul>\n<li>item</li>\n</ul>";
+        let result = normalize_whitespace(html);
+        assert_eq!(result, "<ul><li>item</li></ul>");
+    }
+
+    #[test]
+    fn test_normalize_whitespace_preserves_inline_content() {
+        // Newlines within text content should become spaces
+        let html = "<li>hello\nworld</li>";
+        let result = normalize_whitespace(html);
+        assert_eq!(result, "<li>hello world</li>");
+    }
+
+    #[test]
+    fn test_normalize_whitespace_mixed() {
+        // Mixed: remove between tags, preserve in content
+        let html = "<ul>\n<li>hello\nworld</li>\n</ul>";
+        let result = normalize_whitespace(html);
+        assert_eq!(result, "<ul><li>hello world</li></ul>");
+    }
+
+    #[test]
+    fn test_list_no_extra_whitespace_between_items() {
+        let result = convert("- item1\n- item2\n- item3");
+        // Should not have whitespace between </li> and <li>
+        assert!(!result.contains("</li> <li>"));
+        assert!(!result.contains("</li>\n<li>"));
+        // Should have direct adjacency
+        assert!(result.contains("</li><li>"));
+    }
+
+    #[test]
+    fn test_nested_list_no_extra_whitespace() {
+        let result = convert("- parent\n  - child1\n  - child2");
+        // Should not have whitespace between list tags
+        assert!(!result.contains("</li> <li>"));
+        assert!(!result.contains("<ul> <li>"));
+        assert!(!result.contains("</ul> </li>"));
+    }
+
+    #[test]
+    fn test_inline_html_spacing_preserved() {
+        // HTML tags split across lines should preserve spacing
+        let result = convert("- <u>underline</u>, <span>orange</span>,\n  <strong>strong</strong>");
+        // Should have space before <strong> (from the newline in content)
+        assert!(result.contains("</span>, <strong>"));
+    }
+
+    #[test]
+    fn test_paragraph_structure_preserved() {
+        let result = convert("First paragraph.\n\nSecond paragraph.");
+        // Should have separate <p> tags (semantic structure preserved)
+        assert!(result.contains("<p>First paragraph.</p>"));
+        assert!(result.contains("<p>Second paragraph.</p>"));
+        // Tags should be adjacent (no whitespace between)
+        assert!(result.contains("</p><p>"));
     }
 }

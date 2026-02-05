@@ -1,41 +1,30 @@
 # GFM Feature Demos
 
-## Structures
+- Task
+  - [ ] nested task
+  - [x] nested task
+- Numbered list
+  1. Sub list 1
+  1. Sub list 2
+- Text formatting: ~~deleted text~~, **bold**, _italic_, **_both_**, `code`,
+  ~~**_`all formats`_**~~.
+- HTML:
+  - <u>underline</u>, <span style="color:orange;">orange</span>,
+    <strong>strong</strong>, <em>emphasized</em>, <mark>marked</mark>,
+    <ins>inserted</ins>, <del>deleted</del>, <code>code</code>
+  - H<sub>2</sub>O (subscript), E=mc<sup>2</sup> (superscript)
 
-| Feature   | Supported |
-| --------- | :-------: |
-| `Tables`  |     ✓     |
-| **Align** |     ✓     |
+Inline math $a^2 + b^2 = c^2$, and $\frac{a^2}{\sqrt{2}}$.
 
-- [x] Completed task
-- [ ] Pending task
-  - Sub list 1
-  - Sub list 2
-
----
-
-## Text
-
-~~deleted text~~, **bold**, _italic_, `code`, <u>underline</u>
-
-Big $O(n^2)$, what about $a^2 + b^2 = c^2$? And $\frac{a^2}{\sqrt{2}}$
+Cauchy-Schwarz inequality
 
 $$
-\begin{split}
-T_n^2(x) & = T_n(T_n(x)) \\
-         & = T_n\left(\frac{a}{x^n}\right) \\
-         & = \frac{a}{(\frac{a}{x^n})^n} \\
-         & = \frac{a (x^n)^n}{a^n} \\
-         & = \frac{a x^{n^2}}{a^n} \\
-         & = \frac{x^{n^2}}{a^{n-1}} \\
-         & = x \frac{x^{n^2 - 1}}{a^{n-1}} \\
-         & = x \frac{x^{(n - 1)(n+1)}}{a^{n-1}} \\
-         & = x \frac{(x^{n+1})^{n-1}}{a^{n-1}} \\
-\end{split}
-\tag{2}
+\begin{equation}
+\left( \sum_{i=1}^n a_i b_i \right)^2 \le
+\left( \sum_{i=1}^n a_i^2 \right)
+\left( \sum_{i=1}^n b_i^2 \right)
+\end{equation}
 $$
-
-H<sub>2</sub>O (subscript), E=mc<sup>2</sup> (superscript)
 
 > block quote
 
@@ -73,3 +62,8 @@ Auto link: https://github.com
 ![pic alt](./haru.png "avatar")
 
 [gg]: https://google.com
+
+| Feature      | OK? |
+| ------------ | :-: |
+| `Tables`     |  ✓  |
+| **Formated** |  ✓  |
