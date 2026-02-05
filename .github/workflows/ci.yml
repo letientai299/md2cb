@@ -15,16 +15,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: jdx/mise-action@v2
         with:
-          components: rustfmt, clippy
+          cache: true
+
       - uses: Swatinem/rust-cache@v2
+
       - name: Run tests
-        run: cargo test --verbose
+        run: mise run test
+
       - name: Check formatting
         run: cargo fmt -- --check
+
       - name: Run clippy
-        run: cargo clippy -- -D warnings
+        run: mise run lint
 
   build:
     needs: test
@@ -49,13 +54,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: jdx/mise-action@v2
         with:
-          targets: ${{ matrix.target }}
+          cache: true
 
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
+
+      - name: Add target
+        run: rustup target add ${{ matrix.target }}
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
