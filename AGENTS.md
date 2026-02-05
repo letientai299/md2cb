@@ -70,19 +70,23 @@ test/
 
 ### Prerequisites
 
-- Rust 1.70+ (install via rustup)
+- mise (tool/task manager) - https://mise.jdx.dev
 - Docker (for dev server)
 - pnpm (for markserv)
-- Node.js (only for Playwright tests and regenerating mathjax-bundle.js)
 
-### Make targets
+Run `mise install` to install Rust and Node.js.
+
+### Tasks (via mise)
 
 ```bash
-make          # Build release binary
-make test     # Run tests
-make dev      # Start dev servers and open in browser
-make dev-stop # Stop servers
-make install  # Install to /usr/local/bin
+mise run build        # Build release binary
+mise run test         # Run tests
+mise run lint         # Run clippy linter
+mise run format       # Format code
+mise run dev          # Start dev servers and open in browser
+mise run dev-stop     # Stop servers
+mise run install      # Install to /usr/local/bin
+mise run e2e          # Run E2E tests (FILTER=pattern to filter)
 ```
 
 - **http://localhost:9090** - Rich text editor (Froala) for paste testing
@@ -91,10 +95,10 @@ make install  # Install to /usr/local/bin
 ### Workflow
 
 1. Edit `src/parser.rs` or other source files
-2. Run `make` to rebuild
+2. Run `mise run build` to rebuild
 3. Test with `cat test/demo.md | ./md2cb`
 4. Paste into the editor at localhost:9090 to verify output
-5. Run `make test` to ensure all tests pass
+5. Run `mise run test` to ensure all tests pass
 
 ## Supported Markdown Features
 
@@ -200,6 +204,6 @@ npm package. To update or customize:
 
 1. Download new CSS from https://github.com/sindresorhus/github-markdown-css
 2. Replace `assets/github-markdown.css`
-3. Rebuild with `make`
+3. Rebuild with `mise run build`
 
 The CSS is embedded at compile time using `include_str!()`.

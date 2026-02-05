@@ -187,8 +187,7 @@ mod tests {
 
         assert!(
             result.starts_with(r#"<img src="data:image/png;base64,"#),
-            "Relative path in subdir should be resolved. Got: {}",
-            result
+            "Relative path in subdir should be resolved. Got: {result}"
         );
 
         // Cleanup
@@ -205,7 +204,7 @@ mod tests {
 
         // Use absolute path in HTML
         let abs_path_str = img_path.to_string_lossy();
-        let html = format!(r#"<img src="{}">"#, abs_path_str);
+        let html = format!(r#"<img src="{abs_path_str}">"#);
 
         // base_path shouldn't matter for absolute paths
         let other_dir = std::env::temp_dir().join("md2cb_test_other");
@@ -215,8 +214,7 @@ mod tests {
 
         assert!(
             result.starts_with(r#"<img src="data:image/png;base64,"#),
-            "Absolute path should work regardless of base_path. Got: {}",
-            result
+            "Absolute path should work regardless of base_path. Got: {result}"
         );
 
         // Cleanup

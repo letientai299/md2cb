@@ -242,7 +242,7 @@ fn sanitize_mermaid_svg(svg: &str) -> String {
 fn mermaid_to_png(definition: &str) -> Result<String, String> {
     // Step 1: Convert Mermaid definition to SVG using native Rust library
     let svg = mermaid_rs_renderer::render(definition)
-        .map_err(|e| format!("Mermaid rendering error: {}", e))?;
+        .map_err(|e| format!("Mermaid rendering error: {e}"))?;
 
     // Step 1.5: Sanitize the SVG (fix invalid font-family attributes)
     let svg = sanitize_mermaid_svg(&svg);
@@ -282,7 +282,7 @@ fn convert_mermaid_to_png(html: &str) -> String {
             match mermaid_to_png(&definition) {
                 Ok(img) => format!(r#"<div class="mermaid-diagram">{img}</div>"#),
                 Err(e) => {
-                    eprintln!("Mermaid rendering error: {}", e);
+                    eprintln!("Mermaid rendering error: {e}");
                     format!(
                         r#"<pre class="mermaid-error"><code>{}</code></pre>"#,
                         html_escape(definition)

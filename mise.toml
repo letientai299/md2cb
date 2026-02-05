@@ -1,0 +1,61 @@
+[env]
+EDITOR_PORT = "9090"
+MARKSERV_PORT = "9091"
+PREFIX = "/usr/local"
+
+[tools]
+rust = "1.88"
+node = "lts"
+"npm:markserv" = "latest"
+
+[tasks.build]
+run = "cargo build"
+
+[tasks.release]
+run = "cargo build --release"
+
+[tasks.clean]
+run = """
+cargo clean
+rm -rf e2e/screenshots/*.png
+"""
+
+[tasks.test]
+run = "cargo test"
+
+[tasks.lint]
+run = "cargo clippy -- -D warnings"
+
+[tasks.fmt]
+run = "cargo fmt"
+
+[tasks.dev-stop]
+description = "Stop dev servers"
+run = """
+docker stop md2cb-editor 2>/dev/null || true
+pkill -f "markserv.*$MARKSERV_PORT" 2>/dev/null || true
+"""
+
+[tasks.dev]
+description = "Start dev servers"
+depends = ["dev-stop"]
+run = """
+#!/usr/bin/env bash
+echo "Starting dev servers..."
+docker run -d --rm --name md2cb-editor -p $EDITOR_PORT:80 -v $PWD/test:/usr/share/caddy:ro caddy:latest >/dev/null
+markserv -p $MARKSERV_PORT ./test/demo.md >/dev/null 2>&1 &
+sleep 1
+echo "Rich text editor: http://localhost:$EDITOR_PORT"
+echo "Markdown preview: http://localhost:$MARKSERV_PORT/demo.md"
+echo ""
+echo "Run 'mise run dev-stop' to stop servers"
+"""
+
+[tasks.e2e]
+description = "Run E2E tests"
+depends = ["build"]
+usage = 'arg "[filter]" help="Optional test filter pattern"'
+run = """
+docker start md2cb-editor 2>/dev/null || docker run -d --rm --name md2cb-editor -p $EDITOR_PORT:80 -v $PWD/test:/usr/share/caddy:ro caddy:latest
+node scripts/e2e-test.js ${usage_filter:-}
+"""

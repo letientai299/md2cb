@@ -24,7 +24,7 @@ struct JsRuntimeInner {
 impl JsRuntimeInner {
     /// Create a new JS runtime and initialize MathJax
     fn new() -> Result<Self, String> {
-        let runtime = Runtime::new().map_err(|e| format!("Failed to create JS runtime: {}", e))?;
+        let runtime = Runtime::new().map_err(|e| format!("Failed to create JS runtime: {e}"))?;
 
         // Increase limits for complex math expressions
         // MathJax can be deeply recursive and memory-intensive for complex LaTeX
@@ -32,12 +32,12 @@ impl JsRuntimeInner {
         runtime.set_memory_limit(128 * 1024 * 1024); // 128MB memory
 
         let context =
-            Context::full(&runtime).map_err(|e| format!("Failed to create JS context: {}", e))?;
+            Context::full(&runtime).map_err(|e| format!("Failed to create JS context: {e}"))?;
 
         // Initialize MathJax bundle
         context.with(|ctx| {
             ctx.eval::<(), _>(MATHJAX_BUNDLE.as_bytes().to_vec())
-                .map_err(|e| format!("Failed to initialize MathJax: {}", e))
+                .map_err(|e| format!("Failed to initialize MathJax: {e}"))
         })?;
 
         Ok(Self {
@@ -52,15 +52,15 @@ impl JsRuntimeInner {
             // Escape the latex string for JavaScript
             let escaped_latex = escape_js_string(latex);
 
-            let js_code = format!("convertLatexToSvg('{}', {})", escaped_latex, display);
+            let js_code = format!("convertLatexToSvg('{escaped_latex}', {display})");
 
             let result: String = ctx
                 .eval(js_code.into_bytes())
-                .map_err(|e| format!("JS execution error: {}", e))?;
+                .map_err(|e| format!("JS execution error: {e}"))?;
 
             // Parse JSON result from MathJax
             let parsed: serde_json::Value =
-                serde_json::from_str(&result).map_err(|e| format!("JSON parse error: {}", e))?;
+                serde_json::from_str(&result).map_err(|e| format!("JSON parse error: {e}"))?;
 
             if parsed["success"].as_bool() == Some(true) {
                 parsed["svg"]

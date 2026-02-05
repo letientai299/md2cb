@@ -45,7 +45,7 @@ pub fn render_svg_to_png(svg_content: &str) -> Result<SvgRenderResult, String> {
         fontdb: get_font_db(),
         ..Default::default()
     };
-    let tree = Tree::from_str(svg_content, &opts).map_err(|e| format!("SVG parse error: {}", e))?;
+    let tree = Tree::from_str(svg_content, &opts).map_err(|e| format!("SVG parse error: {e}"))?;
 
     // Get original size from the SVG
     let size = tree.size();
@@ -60,8 +60,7 @@ pub fn render_svg_to_png(svg_content: &str) -> Result<SvgRenderResult, String> {
     const MAX_DIMENSION: u32 = 8192;
     if render_width > MAX_DIMENSION || render_height > MAX_DIMENSION {
         return Err(format!(
-            "SVG dimensions too large: {}x{}",
-            render_width, render_height
+            "SVG dimensions too large: {render_width}x{render_height}"
         ));
     }
 
@@ -83,7 +82,7 @@ pub fn render_svg_to_png(svg_content: &str) -> Result<SvgRenderResult, String> {
     // Encode to PNG
     let png_data = pixmap
         .encode_png()
-        .map_err(|e| format!("PNG encode error: {}", e))?;
+        .map_err(|e| format!("PNG encode error: {e}"))?;
 
     // Base64 encode
     let png_base64 = STANDARD.encode(&png_data);

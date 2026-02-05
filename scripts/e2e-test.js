@@ -9,8 +9,8 @@
  * 4. Comparing against browser-native copy/paste from markserv
  *
  * Prerequisites:
- *   - Dev servers running: `make dev`
- *   - md2cb binary built: `make`
+ *   - Dev servers running: `mise run dev`
+ *   - md2cb binary built: `mise run build`
  *   - Node dependencies: `pnpm install`
  *
  * Usage:
@@ -51,7 +51,7 @@ const CONFIG = {
   headless: process.env.UI !== "true", // Headless by default, visible when UI=true
   fixturesDir: path.join(__dirname, "..", "e2e", "fixtures"),
   screenshotsDir: path.join(__dirname, "..", "e2e", "screenshots"),
-  md2cbPath: path.join(__dirname, "..", "md2cb"),
+  md2cbPath: path.join(__dirname, "..", "target", "debug", "md2cb"),
   platform: process.platform,
 };
 
@@ -379,7 +379,7 @@ function startMarkserv() {
   // Run markserv as a background process using exec
   // Use relative path from project root since markserv has issues with absolute paths
   // Use --no-browser to prevent opening system browser
-  const cmd = `pnpx markserv --no-browser -p ${CONFIG.markservPort} ./e2e/fixtures`;
+  const cmd = `markserv --no-browser -p ${CONFIG.markservPort} ./e2e/fixtures`;
   const proc = exec(cmd, { cwd: path.join(__dirname, "..") });
 
   // Log critical errors only (filter out deprecation warnings and ENOENT)
@@ -448,8 +448,8 @@ ${colors.cyan}Environment Variables:${colors.reset}
   UI=true               Show browser window (for debugging)
 
 ${colors.cyan}Prerequisites:${colors.reset}
-  1. Build the tool:     make
-  2. Start dev servers:  make dev
+  1. Build the tool:     mise run build
+  2. Start dev servers:  mise run dev
   3. Install deps:       pnpm install
 
 ${colors.cyan}Platform Requirements:${colors.reset}
@@ -484,7 +484,7 @@ async function main() {
   // Check prerequisites
   if (!fs.existsSync(CONFIG.md2cbPath)) {
     logError(`md2cb binary not found at ${CONFIG.md2cbPath}`);
-    logError("Run 'make' to build the tool first.");
+    logError("Run 'mise run build' to build the tool first.");
     process.exit(1);
   }
 
@@ -499,7 +499,7 @@ async function main() {
 
   if (!servers.editor) {
     logError(`Editor server not running on port ${CONFIG.editorPort}`);
-    logError("Run 'make dev' to start dev servers.");
+    logError("Run 'mise run dev' to start dev servers.");
     process.exit(1);
   }
 
@@ -515,7 +515,7 @@ async function main() {
     const ready = await waitForServer(markservUrl, 20000);
     if (!ready) {
       logError(`Markserv failed to start on port ${CONFIG.markservPort}`);
-      logError("Try running: pnpx markserv -p 9091 ./e2e/fixtures");
+      logError("Try running: markserv -p 9091 ./e2e/fixtures");
       if (markservProc) markservProc.kill();
       process.exit(1);
     }

@@ -41,15 +41,17 @@ assets/
 ## Build
 
 ```bash
-make              # Build release binary → ./md2cb
-make clean        # Clean build artifacts
+mise run build       # Build debug binary → ./target/debug/md2cb
+mise run release     # Build release binary → ./target/release/md2cb
+mise run clean       # Clean build artifacts
 ```
 
 ## Development
 
 ```bash
-make dev          # Start test servers and open in browser
-make dev-stop     # Stop test servers
+mise run dev         # Start test servers
+mise run dev-stop    # Stop test servers
+mise run e2e         # Run E2E tests
 ```
 
 - Rich text editor: http://localhost:9090
