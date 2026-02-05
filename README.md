@@ -33,7 +33,20 @@ Use `-d <path>` to specify a custom directory.
 
 ## Demo
 
-> TODO (tai): prepare a demo image for several apps.
+Rendered from [`test/demo.md`](./test/demo.md).
+
+<table>
+  <tr>
+    <td align="center"><strong>Microsoft Teams</strong></td>
+    <td align="center"><strong>Google Docs</strong></td>
+    <td align="center"><strong>Froala Editor for reference</strong></td>
+  </tr>
+  <tr>
+    <td><img src="images/teams.jpg" alt="Teams demo" width="300"></td>
+    <td><img src="images/gdocs.jpg" alt="Google Docs demo" width="300"></td>
+    <td><img src="images/flora.jpg" alt="Froala demo" width="300"></td>
+  </tr>
+</table>
 
 ## Development
 
