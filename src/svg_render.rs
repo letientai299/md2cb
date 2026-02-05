@@ -3,9 +3,9 @@
 //! Converts SVG strings to PNG images with high-resolution rendering
 //! for crisp output when displayed at smaller sizes.
 
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use resvg::tiny_skia::{Pixmap, Transform};
-use resvg::usvg::{fontdb, Options, Tree};
+use resvg::usvg::{Options, Tree, fontdb};
 use std::sync::{Arc, OnceLock};
 
 /// Render scale factor for crisp output (4x like the original Node.js implementation)
@@ -45,8 +45,7 @@ pub fn render_svg_to_png(svg_content: &str) -> Result<SvgRenderResult, String> {
         fontdb: get_font_db(),
         ..Default::default()
     };
-    let tree = Tree::from_str(svg_content, &opts)
-        .map_err(|e| format!("SVG parse error: {}", e))?;
+    let tree = Tree::from_str(svg_content, &opts).map_err(|e| format!("SVG parse error: {}", e))?;
 
     // Get original size from the SVG
     let size = tree.size();

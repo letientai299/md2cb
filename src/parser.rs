@@ -1,7 +1,7 @@
 //! GitHub Flavored Markdown to HTML converter using comrak.
 
 use comrak::plugins::syntect::SyntectAdapterBuilder;
-use comrak::{markdown_to_html_with_plugins, Options, Plugins};
+use comrak::{Options, Plugins, markdown_to_html_with_plugins};
 use regex::Regex;
 use std::sync::LazyLock;
 
@@ -9,37 +9,31 @@ use crate::js_runtime;
 use crate::svg_render;
 
 // Static regex patterns - compiled once and reused
-static PRE_BG_COLOR_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"<pre style="background-color:#[0-9a-fA-F]+;">"#).unwrap()
-});
+static PRE_BG_COLOR_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<pre style="background-color:#[0-9a-fA-F]+;">"#).unwrap());
 
-static CHECKED_CHECKBOX_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"<input[^>]*type="checkbox"[^>]*checked[^>]*/?\s*>"#).unwrap()
-});
+static CHECKED_CHECKBOX_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<input[^>]*type="checkbox"[^>]*checked[^>]*/?\s*>"#).unwrap());
 
-static UNCHECKED_CHECKBOX_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"<input[^>]*type="checkbox"[^>]*/?\s*>"#).unwrap()
-});
+static UNCHECKED_CHECKBOX_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<input[^>]*type="checkbox"[^>]*/?\s*>"#).unwrap());
 
-static DISPLAY_MATH_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"<span data-math-style="display">([^<]*)</span>"#).unwrap()
-});
+static DISPLAY_MATH_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<span data-math-style="display">([^<]*)</span>"#).unwrap());
 
-static INLINE_MATH_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"<span data-math-style="inline">([^<]*)</span>"#).unwrap()
-});
+static INLINE_MATH_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<span data-math-style="inline">([^<]*)</span>"#).unwrap());
 
 static MATH_CODE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"<pre><code class="language-math" data-math-style="display">([^<]*)</code></pre>"#).unwrap()
+    Regex::new(r#"<pre><code class="language-math" data-math-style="display">([^<]*)</code></pre>"#)
+        .unwrap()
 });
 
 static MERMAID_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"<pre[^>]*><code class="language-mermaid">([\s\S]*?)</code></pre>"#).unwrap()
 });
 
-static SPAN_TAG_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"</?span[^>]*>"#).unwrap()
-});
+static SPAN_TAG_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"</?span[^>]*>"#).unwrap());
 
 // Static comrak options - built once and reused
 static COMRAK_OPTIONS: LazyLock<Options> = LazyLock::new(build_options);
@@ -92,7 +86,9 @@ fn convert_checkboxes_to_unicode(html: &str) -> String {
     let result = CHECKED_CHECKBOX_RE.replace_all(html, "✅ ");
 
     // Match unchecked checkbox (no "checked" attribute)
-    UNCHECKED_CHECKBOX_RE.replace_all(&result, "⬜ ").into_owned()
+    UNCHECKED_CHECKBOX_RE
+        .replace_all(&result, "⬜ ")
+        .into_owned()
 }
 
 /// Builds comrak options with GFM extensions enabled.
@@ -182,32 +178,30 @@ fn latex_to_svg(latex: &str, display: bool) -> Result<String, String> {
 /// This function converts the LaTeX content to inline SVG.
 fn convert_math_to_svg(html: &str) -> String {
     // Match display math spans
-    let result = DISPLAY_MATH_RE
-        .replace_all(html, |caps: &regex::Captures| {
-            let latex_raw = caps.get(1).map(|m| m.as_str()).unwrap_or("");
-            let latex = decode_html_entities(latex_raw);
-            match latex_to_svg(&latex, true) {
-                Ok(svg) => format!(r#"<div class="math math-display">{svg}</div>"#),
-                Err(_) => format!(
-                    r#"<div class="math math-display math-error">$${}$$</div>"#,
-                    html_escape(latex)
-                ),
-            }
-        });
+    let result = DISPLAY_MATH_RE.replace_all(html, |caps: &regex::Captures| {
+        let latex_raw = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+        let latex = decode_html_entities(latex_raw);
+        match latex_to_svg(&latex, true) {
+            Ok(svg) => format!(r#"<div class="math math-display">{svg}</div>"#),
+            Err(_) => format!(
+                r#"<div class="math math-display math-error">$${}$$</div>"#,
+                html_escape(latex)
+            ),
+        }
+    });
 
     // Match inline math spans
-    let result = INLINE_MATH_RE
-        .replace_all(&result, |caps: &regex::Captures| {
-            let latex_raw = caps.get(1).map(|m| m.as_str()).unwrap_or("");
-            let latex = decode_html_entities(latex_raw);
-            match latex_to_svg(&latex, false) {
-                Ok(svg) => format!(r#"<span class="math math-inline">{svg}</span>"#),
-                Err(_) => format!(
-                    r#"<span class="math math-inline math-error">${}$</span>"#,
-                    html_escape(latex)
-                ),
-            }
-        });
+    let result = INLINE_MATH_RE.replace_all(&result, |caps: &regex::Captures| {
+        let latex_raw = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+        let latex = decode_html_entities(latex_raw);
+        match latex_to_svg(&latex, false) {
+            Ok(svg) => format!(r#"<span class="math math-inline">{svg}</span>"#),
+            Err(_) => format!(
+                r#"<span class="math math-inline math-error">${}$</span>"#,
+                html_escape(latex)
+            ),
+        }
+    });
 
     // Also handle math code blocks (```math)
     MATH_CODE_RE
@@ -412,7 +406,10 @@ mod tests {
         let result = convert("$$x^2 + y^2 = z^2$$");
         assert!(result.contains("math-display"));
         assert!(result.contains("<img"));
-        assert!(result.contains("data:image/png;base64") || result.contains("data:image/svg+xml;base64"));
+        assert!(
+            result.contains("data:image/png;base64")
+                || result.contains("data:image/svg+xml;base64")
+        );
     }
 
     #[test]
@@ -420,7 +417,10 @@ mod tests {
         let result = convert("The equation $E = mc^2$ is famous.");
         assert!(result.contains("math-inline"));
         assert!(result.contains("<img"));
-        assert!(result.contains("data:image/png;base64") || result.contains("data:image/svg+xml;base64"));
+        assert!(
+            result.contains("data:image/png;base64")
+                || result.contains("data:image/svg+xml;base64")
+        );
     }
 
     #[test]
@@ -440,12 +440,14 @@ mod tests {
     #[test]
     fn test_math_split_environment() {
         // Test complex LaTeX that requires display mode
-        let result = convert(r#"$$
+        let result = convert(
+            r#"$$
 \begin{split}
 p_n &= 1-\frac{1}{2^r} \\
 q_n &= \frac{1}{2^r}
 \end{split}
-$$"#);
+$$"#,
+        );
         assert!(result.contains("math-display"));
         assert!(result.contains("<img"));
         // Should NOT have parse error
@@ -469,7 +471,9 @@ $$"#);
 
     #[test]
     fn test_mermaid_complex_flowchart() {
-        let result = convert("```mermaid\ngraph TD\n    A[Start] --> B{Decision}\n    B -->|Yes| C[OK]\n    B -->|No| D[Cancel]\n```");
+        let result = convert(
+            "```mermaid\ngraph TD\n    A[Start] --> B{Decision}\n    B -->|Yes| C[OK]\n    B -->|No| D[Cancel]\n```",
+        );
         assert!(result.contains("mermaid-diagram"));
         assert!(result.contains("<img"));
         // Should NOT have error

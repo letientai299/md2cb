@@ -24,16 +24,15 @@ struct JsRuntimeInner {
 impl JsRuntimeInner {
     /// Create a new JS runtime and initialize MathJax
     fn new() -> Result<Self, String> {
-        let runtime = Runtime::new()
-            .map_err(|e| format!("Failed to create JS runtime: {}", e))?;
+        let runtime = Runtime::new().map_err(|e| format!("Failed to create JS runtime: {}", e))?;
 
         // Increase limits for complex math expressions
         // MathJax can be deeply recursive and memory-intensive for complex LaTeX
         runtime.set_max_stack_size(8 * 1024 * 1024); // 8MB stack
         runtime.set_memory_limit(128 * 1024 * 1024); // 128MB memory
 
-        let context = Context::full(&runtime)
-            .map_err(|e| format!("Failed to create JS context: {}", e))?;
+        let context =
+            Context::full(&runtime).map_err(|e| format!("Failed to create JS context: {}", e))?;
 
         // Initialize MathJax bundle
         context.with(|ctx| {
@@ -53,19 +52,15 @@ impl JsRuntimeInner {
             // Escape the latex string for JavaScript
             let escaped_latex = escape_js_string(latex);
 
-            let js_code = format!(
-                "convertLatexToSvg('{}', {})",
-                escaped_latex,
-                display
-            );
+            let js_code = format!("convertLatexToSvg('{}', {})", escaped_latex, display);
 
             let result: String = ctx
                 .eval(js_code.into_bytes())
                 .map_err(|e| format!("JS execution error: {}", e))?;
 
             // Parse JSON result from MathJax
-            let parsed: serde_json::Value = serde_json::from_str(&result)
-                .map_err(|e| format!("JSON parse error: {}", e))?;
+            let parsed: serde_json::Value =
+                serde_json::from_str(&result).map_err(|e| format!("JSON parse error: {}", e))?;
 
             if parsed["success"].as_bool() == Some(true) {
                 parsed["svg"]
@@ -138,11 +133,8 @@ mod tests {
 
     #[test]
     fn test_complex_latex() {
-        let svg = convert_latex_to_svg(
-            r"\begin{split} a &= b \\ c &= d \end{split}",
-            true,
-        )
-        .unwrap();
+        let svg =
+            convert_latex_to_svg(r"\begin{split} a &= b \\ c &= d \end{split}", true).unwrap();
         assert!(svg.contains("<svg"));
     }
 

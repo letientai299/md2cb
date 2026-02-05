@@ -13,19 +13,16 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn print_help() {
     eprintln!(
-        "md2cb - Convert GitHub Flavored Markdown to rich HTML clipboard content
+        "md2cb - Convert Markdown to rich HTML clipboard content
 
 USAGE:
-    md2cb [OPTIONS] [FILE]
+    md2cb [OPTIONS] [FILE/STDIN]
     cat file.md | md2cb
 
 OPTIONS:
-    -e, --edit       Open $EDITOR to edit markdown before converting
+    -e, --edit       Open $EDITOR to edit before converting
     -h, --help       Print this help message
     -V, --version    Print version information
-
-ARGS:
-    [FILE]           Input markdown file
 
 DESCRIPTION:
     Reads Markdown from stdin, converts it to styled HTML, and copies
@@ -35,18 +32,7 @@ DESCRIPTION:
 FEATURES:
     - GitHub Flavored Markdown (tables, task lists, strikethrough, etc.)
     - Math equations rendered as PNG images (embedded MathJax)
-    - Images automatically inlined as base64 data URIs
-    - GitHub-style CSS embedded for consistent styling
-    - Single binary with no external dependencies
-
-EXAMPLES:
-    md2cb README.md            # Convert file directly
-    cat README.md | md2cb      # Convert from stdin
-    echo '# Hello' | md2cb
-    md2cb < document.md
-    md2cb -e                   # Open editor with empty file
-    md2cb -e README.md         # Edit file before converting
-    cat README.md | md2cb -e   # Edit piped content before converting"
+    - Images automatically inlined as base64 data URIs"
     );
 }
 
@@ -70,8 +56,8 @@ fn edit_in_editor(initial_content: &str) -> Result<String, String> {
     let temp_path = temp_file_path();
 
     // Write initial content to temp file
-    let mut file = fs::File::create(&temp_path)
-        .map_err(|e| format!("Failed to create temp file: {e}"))?;
+    let mut file =
+        fs::File::create(&temp_path).map_err(|e| format!("Failed to create temp file: {e}"))?;
     file.write_all(initial_content.as_bytes())
         .map_err(|e| format!("Failed to write temp file: {e}"))?;
     drop(file);
@@ -88,8 +74,8 @@ fn edit_in_editor(initial_content: &str) -> Result<String, String> {
     }
 
     // Read back the edited content
-    let content = fs::read_to_string(&temp_path)
-        .map_err(|e| format!("Failed to read temp file: {e}"))?;
+    let content =
+        fs::read_to_string(&temp_path).map_err(|e| format!("Failed to read temp file: {e}"))?;
 
     // Clean up temp file
     let _ = fs::remove_file(&temp_path);
@@ -197,7 +183,7 @@ struct Config {
 
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
-    
+
     let config = match parse_args(&args) {
         Ok(c) => c,
         Err(e) => {
@@ -222,7 +208,7 @@ fn main() {
 
     let input_file = config.input_file.as_deref();
     let edit_mode = config.edit_mode;
-    
+
     // Read markdown content and track base path for relative image resolution
     let mut markdown = String::new();
     let base_path: Option<std::path::PathBuf> = if let Some(file_path) = input_file {

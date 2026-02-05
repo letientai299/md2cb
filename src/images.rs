@@ -1,6 +1,6 @@
 //! Image inlining - converts image URLs to base64 data URIs.
 
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
@@ -9,9 +9,8 @@ use std::path::Path;
 use std::sync::LazyLock;
 
 // Static regex pattern for matching img tags
-static IMG_TAG_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"<img([^>]*)\ssrc="([^"]+)"([^>]*)>"#).unwrap()
-});
+static IMG_TAG_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<img([^>]*)\ssrc="([^"]+)"([^>]*)>"#).unwrap());
 
 /// Inlines all images in the HTML by converting URLs to base64 data URIs.
 /// This ensures pasted content contains the actual image data.
@@ -27,7 +26,13 @@ pub fn inline_images(html: &str, base_path: Option<&Path>) -> String {
             let before = cap.get(1).unwrap().as_str();
             let src = cap.get(2).unwrap().as_str();
             let after = cap.get(3).unwrap().as_str();
-            (full.start(), full.end(), before.to_string(), src.to_string(), after.to_string())
+            (
+                full.start(),
+                full.end(),
+                before.to_string(),
+                src.to_string(),
+                after.to_string(),
+            )
         })
         .collect();
 
@@ -100,7 +105,7 @@ fn fetch_local_image(path: &str, base_path: Option<&Path>) -> Option<String> {
             // Prevent path traversal for relative paths
             let canonical_base = base.canonicalize().ok()?;
             let canonical_full = full.canonicalize().ok()?;
-            
+
             if !canonical_full.starts_with(&canonical_base) {
                 return None;
             }
@@ -137,11 +142,10 @@ mod tests {
 
     // Minimal PNG (1x1 transparent pixel)
     const PNG_BYTES: [u8; 67] = [
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
-        0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-        0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
-        0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
-        0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F,
+        0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00,
+        0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
         0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
     ];
 
@@ -242,7 +246,7 @@ mod tests {
         let root_dir = std::env::temp_dir().join("md2cb_test_traversal");
         let base_dir = root_dir.join("base");
         fs::create_dir_all(&base_dir).unwrap();
-        
+
         let secret_path = root_dir.join("secret.png");
         fs::write(&secret_path, PNG_BYTES).unwrap();
 
@@ -261,7 +265,7 @@ mod tests {
         // Changing CWD in tests is bad (parallelism).
         // But fetch_local_image with None uses Path::new(path).to_path_buf().
         // If we give an absolute path, it should work.
-        
+
         let test_dir = std::env::temp_dir().join("md2cb_test_nobase");
         fs::create_dir_all(&test_dir).unwrap();
         let img_path = test_dir.join("nobase.png");
@@ -269,8 +273,11 @@ mod tests {
 
         let path_str = img_path.to_string_lossy();
         let result = fetch_local_image(&path_str, None);
-        
-        assert!(result.is_some(), "Should work with absolute path and no base_path");
+
+        assert!(
+            result.is_some(),
+            "Should work with absolute path and no base_path"
+        );
         let uri = result.unwrap();
         assert!(uri.starts_with("data:image/png;base64,"));
 
