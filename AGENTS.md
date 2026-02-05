@@ -72,9 +72,9 @@ test/
 
 - mise (tool/task manager) - https://mise.jdx.dev
 - Docker (for dev server)
-- pnpm (for markserv)
 
-Run `mise install` to install Rust and Node.js.
+Run `mise install` to install Rust, Node.js, pnpm, and markserv.
+Run `pnpm install` to install Node.js dependencies (playwright, mathjax, etc.).
 
 ### Tasks (via mise)
 

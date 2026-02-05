@@ -1,11 +1,11 @@
 [env]
 EDITOR_PORT = "9090"
 MARKSERV_PORT = "9091"
-PREFIX = "/usr/local"
 
 [tools]
 rust = "1.88"
 node = "lts"
+pnpm = "latest"
 "npm:markserv" = "latest"
 
 [tasks.build]
