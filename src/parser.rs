@@ -36,14 +36,11 @@ static MERMAID_RE: LazyLock<Regex> = LazyLock::new(|| {
 static SPAN_TAG_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"</?span[^>]*>"#).unwrap());
 
 // Match code blocks for newline conversion (pre tag with code inside)
-static CODE_BLOCK_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"(<pre[^>]*><code[^>]*>)([\s\S]*?)(</code></pre>)"#).unwrap()
-});
+static CODE_BLOCK_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(<pre[^>]*><code[^>]*>)([\s\S]*?)(</code></pre>)"#).unwrap());
 
 // Match whitespace between block-level tags (should be removed, not converted to space)
-static BLOCK_TAG_WHITESPACE_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r">\s+<").unwrap()
-});
+static BLOCK_TAG_WHITESPACE_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r">\s+<").unwrap());
 
 // Static comrak options - built once and reused
 static COMRAK_OPTIONS: LazyLock<Options> = LazyLock::new(build_options);
@@ -86,6 +83,7 @@ pub fn convert(markdown: &str) -> String {
 /// Normalizes whitespace in HTML content.
 /// - Removes whitespace between HTML tags (block-level structure)
 /// - Converts newlines within text content to spaces (inline text wrapping)
+///
 /// Code blocks are unaffected since their newlines have already been converted to `<br>` tags.
 fn normalize_whitespace(html: &str) -> String {
     // First, remove whitespace between tags (preserves block structure without gaps)

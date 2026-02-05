@@ -9,7 +9,8 @@ use std::fs;
 use std::io::{self, Read, Write};
 use std::process::Command;
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+const VERSION: &str = env!("GIT_VERSION");
+const REPO_URL: &str = "https://github.com/letientai299/md2cb";
 
 fn print_help() {
     eprintln!(
@@ -32,12 +33,14 @@ DESCRIPTION:
 FEATURES:
     - GitHub Flavored Markdown (tables, task lists, strikethrough, etc.)
     - Math equations rendered as PNG images (embedded MathJax)
-    - Images automatically inlined as base64 data URIs"
+    - Images automatically inlined as base64 data URIs
+
+{REPO_URL}"
     );
 }
 
 fn print_version() {
-    eprintln!("md2cb {VERSION}");
+    eprintln!("md2cb {VERSION}\n{REPO_URL}");
 }
 
 /// Generate a random temp file path with .md extension
