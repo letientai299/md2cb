@@ -14,6 +14,23 @@ Then, paste the copied clipboard content to the target app.
 Add `--edit/-e` flag to edit the content in `$EDITOR` before converting. `-e`
 would open an empty markdown file if run without any input (file or stdin).
 
+## Installation
+
+**Linux/macOS:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/letientai299/md2cb/main/scripts/install.sh | bash
+```
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://raw.githubusercontent.com/letientai299/md2cb/main/scripts/install.ps1 | iex
+```
+
+Installs to `/usr/local/bin` (Unix) or `%USERPROFILE%\bin` (Windows) by default.
+Use `-d <path>` to specify a custom directory.
+
 ## Demo
 
 > TODO (tai): prepare a demo image for several apps.
