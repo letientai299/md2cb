@@ -6,6 +6,7 @@ MARKSERV_PORT = "9091"
 rust = "1.88"
 node = "lts"
 pnpm = "latest"
+prek = "latest"
 "npm:markserv" = "latest"
 
 [tasks.build]
