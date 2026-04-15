@@ -11,7 +11,7 @@ use arboard::SetExtLinux;
 ///
 /// On all platforms, this sets the HTML MIME type so rich text editors
 /// can paste the formatted content.
-pub fn copy_html(html: &str) -> Result<(), Box<dyn Error>> {
+pub fn copy_html(html: &str, alt_text: &str) -> Result<(), Box<dyn Error>> {
     let mut clipboard = Clipboard::new()?;
 
     // On Linux, we need to fork to keep clipboard content available after process exits
@@ -20,7 +20,10 @@ pub fn copy_html(html: &str) -> Result<(), Box<dyn Error>> {
         not(any(target_os = "macos", target_os = "android", target_os = "emscripten"))
     ))]
     {
-        clipboard.set().wait().html(html.to_string(), None)?;
+        clipboard
+            .set()
+            .wait()
+            .html(html.to_string(), Some(alt_text.to_string()))?;
     }
 
     // On macOS and Windows, simple set_html works
@@ -31,7 +34,7 @@ pub fn copy_html(html: &str) -> Result<(), Box<dyn Error>> {
         target_os = "emscripten"
     ))]
     {
-        clipboard.set_html(html, None)?;
+        clipboard.set_html(html, Some(alt_text))?;
     }
 
     Ok(())

@@ -268,7 +268,7 @@ fn main() {
     );
 
     // Copy to clipboard
-    match clipboard::copy_html(&full_html) {
+    match clipboard::copy_html(&full_html, &markdown) {
         Ok(()) => eprintln!("Copied to clipboard"),
         Err(e) => {
             eprintln!("Error copying to clipboard: {e}");
